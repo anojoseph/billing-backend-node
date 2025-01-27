@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import { generateAccessToken, generateRefreshToken, verifyToken } from "../utils/jwt"; // Modify to use both token generators
-import UserModel from "../models/User";
+import { generateAccessToken, generateRefreshToken, verifyToken } from "../../utils/jwt"; // Modify to use both token generators
+import UserModel from "../../models/auth/User";
 import { v4 as uuidv4 } from "uuid";
 
 export const registerSuperadmin = async (req: Request, res: Response): Promise<void> => {
