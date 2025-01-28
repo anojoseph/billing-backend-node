@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import ProductItemModel from "../../models/product/produtcItem"; // Corrected the typo here
 
-export const getAllProductItems = async (req: Request, res: Response)=> {
+export const getAllProductItems = async (req: Request, res: Response) => {
     try {
         const productItems = await ProductItemModel.find();
         res.status(200).json(productItems);
@@ -14,7 +14,7 @@ export const getAllProductItems = async (req: Request, res: Response)=> {
 export const getProductItemById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const productItem = await ProductItemModel.findById(id);
+        const productItem = await ProductItemModel.findOne({ id: id });
         if (!productItem) {
             res.status(404).json({ message: "Product item not found" });
             return;
@@ -25,6 +25,7 @@ export const getProductItemById = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error retrieving product item", error });
     }
 };
+
 
 export const createProductItem = async (req: Request, res: Response) => {
     try {
@@ -42,8 +43,8 @@ export const updateProductItem = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { name, status } = req.body;
-        const updatedProductItem = await ProductItemModel.findByIdAndUpdate(
-            id,
+        const updatedProductItem = await ProductItemModel.findOneAndUpdate(
+            { id: id },
             { name, status },
             { new: true, runValidators: true }
         );
@@ -60,10 +61,10 @@ export const updateProductItem = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteProductItem = async (req: Request, res: Response)=> {
+export const deleteProductItem = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const deletedProductItem = await ProductItemModel.findByIdAndDelete(id);
+        const deletedProductItem = await ProductItemModel.findOneAndUpdate({ id: id }, { deleted_at: new Date() });
         if (!deletedProductItem) {
             res.status(404).json({ message: "Product item not found" });
             return;
