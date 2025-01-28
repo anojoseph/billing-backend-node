@@ -12,12 +12,23 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:4200', // Local development
+  'https://billing-frontend-4pxo.onrender.com' // Production frontend
+];
 
-app.use(cors({
-  origin: 'http://localhost:4200', 
-}));
+const corsOptions = {
+  origin: (origin:any, callback:any) => {
+    // Allow the specified origins or no origin (for non-browser requests)
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+};
 
+app.use(cors(corsOptions));
 mongoose
   .connect(process.env.MONGO_URI as string)
   .then(() => console.log("MongoDB Atlas connected"))
