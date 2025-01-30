@@ -8,18 +8,15 @@ import datatableRoutes from './routes/datatable/datatableRoute';
 import cors from 'cors';
 
 dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
-  'http://localhost:4200', // Local development
-  'https://billing-frontend-4pxo.onrender.com' // Production frontend
+  'http://localhost:4200','https://billing-frontend-4pxo.onrender.com'
 ];
 
 const corsOptions = {
   origin: (origin:any, callback:any) => {
-    // Allow the specified origins or no origin (for non-browser requests)
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
