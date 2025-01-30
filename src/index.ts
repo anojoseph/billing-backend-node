@@ -2,6 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth/authRoute";
 import productRoute from "./routes/product/product";
+import tableRoute from "./routes/table/table";
+
 import mongoose from "mongoose";
 import { authMiddleware } from "./middlewares/auth/auth";
 import datatableRoutes from './routes/datatable/datatableRoute';
@@ -37,6 +39,7 @@ app.use("/api/auth", authRoutes);
 app.use(authMiddleware);
 app.use('/data-table', datatableRoutes);
 app.use("/product", productRoute);
+app.use("/table", tableRoute);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

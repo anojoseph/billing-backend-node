@@ -4,6 +4,8 @@ import mongoose from 'mongoose';
 const allowedFields: Record<string, string[]> = {
     ProductItem: ['id', 'name', 'status'],
     MealType: ['id', 'name', 'status'],
+    Table: ['id', 'name', 'no', 'status', 'qr_code'],
+
 };
 
 export const getItems = async (req: Request, res: Response): Promise<void> => {
