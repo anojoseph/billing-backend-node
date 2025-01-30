@@ -1,14 +1,14 @@
 import mongoose, { Document, Schema } from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 
-interface ProductItemModel extends Document {
+interface MealTypeModel extends Document {
     id: string;
     name: string;
     status: boolean;
     deleted_at?: Date | null;
 }
 
-const productItemSchema = new Schema<ProductItemModel>(
+const MealTypeModelSchema = new Schema<MealTypeModel>(
     {
         id: { type: String, default: uuidv4 },
         name: { type: String, required: true, unique: true },
@@ -20,6 +20,6 @@ const productItemSchema = new Schema<ProductItemModel>(
     }
 );
 
-const ProductItemModel = mongoose.model<ProductItemModel>("ProductItem", productItemSchema);
+const MealTypeModel = mongoose.model<MealTypeModel>("MealType", MealTypeModelSchema);
 
-export default ProductItemModel;
+export default MealTypeModel;
