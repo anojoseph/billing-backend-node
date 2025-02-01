@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import MealTypeModel from "../../models/product/mealType"; // Corrected the typo here
+import MealTypeModel from "../../models/product/mealType";
 
 export const getAllMealTypes = async (req: Request, res: Response) => {
     try {
@@ -13,7 +13,7 @@ export const getAllMealTypes = async (req: Request, res: Response) => {
 export const getMealTypeById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const MealType = await MealTypeModel.findOne({ id: id });
+        const MealType = await MealTypeModel.findById(id);
         if (!MealType) {
             res.status(404).json({ message: "Meal type not found" });
             return;
@@ -24,7 +24,6 @@ export const getMealTypeById = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error retrieving meal type", error });
     }
 };
-
 
 export const createMealType = async (req: Request, res: Response) => {
     try {
@@ -42,43 +41,40 @@ export const createMealType = async (req: Request, res: Response) => {
     }
 };
 
-export const updateMealType = async (req: Request, res: Response): Promise<void> => {
+export const updateMealType = async (req: Request, res: Response) => {
     try {
-        const { id } = req.params; // This is the custom `id` field from the URL
-        const { name, price } = req.body;
+        const { id } = req.params;
+        const { name } = req.body;
 
-        // Check if a product with the same name already exists (excluding the current product)
         if (name) {
-            const existingMeal = await MealTypeModel.findOne({ name, id: { $ne: id } });
-
+            const existingMeal = await MealTypeModel.findOne({ name, _id: { $ne: id } });
             if (existingMeal) {
                 res.status(400).json({ message: "Meal Type with this name already exists" });
                 return;
             }
         }
 
-        // Update the product using the custom `id` field
-        const updatedProduct = await MealTypeModel.findOneAndUpdate(
-            { id: id }, // Query by the custom `id` field
-            { name, price }, // Fields to update
-            { new: true, runValidators: true } // Options: return the updated document and run validators
+        const updatedMealType = await MealTypeModel.findByIdAndUpdate(
+            id,
+            { name },
+            { new: true, runValidators: true }
         );
 
-        if (!updatedProduct) {
-            res.status(404).json({ message: "Product not found" });
+        if (!updatedMealType) {
+            res.status(404).json({ message: "Meal type not found" });
             return;
         }
 
-        res.status(200).json(updatedProduct);
+        res.status(200).json(updatedMealType);
     } catch (error) {
-        res.status(500).json({ message: "Error updating product", error });
+        res.status(500).json({ message: "Error updating meal type", error });
     }
 };
 
 export const deleteMealType = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const deletedMealType = await MealTypeModel.findOneAndUpdate({ id: id }, { deleted_at: new Date() });
+        const deletedMealType = await MealTypeModel.findByIdAndUpdate(id, { deleted_at: new Date() });
         if (!deletedMealType) {
             res.status(404).json({ message: "Meal type not found" });
             return;

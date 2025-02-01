@@ -8,17 +8,19 @@ import mongoose from "mongoose";
 import { authMiddleware } from "./middlewares/auth/auth";
 import datatableRoutes from './routes/datatable/datatableRoute';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
-  'http://localhost:4200','https://billing-frontend-4pxo.onrender.com'
+  'http://localhost:4200', 'https://billing-frontend-4pxo.onrender.com'
 ];
 
 const corsOptions = {
-  origin: (origin:any, callback:any) => {
+  origin: (origin: any, callback: any) => {
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
@@ -35,6 +37,9 @@ mongoose
 
 app.use(express.json());
 app.use("/api/auth", authRoutes);
+
+const uploadsDir = path.join(__dirname, '../uploads');
+app.use('/uploads', express.static(uploadsDir));
 
 app.use(authMiddleware);
 app.use('/data-table', datatableRoutes);

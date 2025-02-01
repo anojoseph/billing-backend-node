@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import ProductItemModel from "../../models/product/produtcItem"; // Corrected the typo here
+import ProductItemModel from "../../models/product/produtcItem"; // Corrected the filename typo
 
 export const getAllProductItems = async (req: Request, res: Response) => {
     try {
@@ -14,7 +14,7 @@ export const getAllProductItems = async (req: Request, res: Response) => {
 export const getProductItemById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const productItem = await ProductItemModel.findOne({ id: id });
+        const productItem = await ProductItemModel.findById(id);
         if (!productItem) {
             res.status(404).json({ message: "Product item not found" });
             return;
@@ -25,7 +25,6 @@ export const getProductItemById = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error retrieving product item", error });
     }
 };
-
 
 export const createProductItem = async (req: Request, res: Response) => {
     try {
@@ -43,8 +42,8 @@ export const updateProductItem = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { name, status } = req.body;
-        const updatedProductItem = await ProductItemModel.findOneAndUpdate(
-            { id: id },
+        const updatedProductItem = await ProductItemModel.findByIdAndUpdate(
+            id,
             { name, status },
             { new: true, runValidators: true }
         );
@@ -64,7 +63,11 @@ export const updateProductItem = async (req: Request, res: Response) => {
 export const deleteProductItem = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const deletedProductItem = await ProductItemModel.findOneAndUpdate({ id: id }, { deleted_at: new Date() });
+        const deletedProductItem = await ProductItemModel.findByIdAndUpdate(
+            id,
+            { deleted_at: new Date() },
+            { new: true }
+        );
         if (!deletedProductItem) {
             res.status(404).json({ message: "Product item not found" });
             return;

@@ -1,68 +1,65 @@
 import { Request, Response } from "express";
-import TableModel from "../../models/table/table"; // Corrected the typo here
+import TableModel from "../../models/table/table";
 
 export const getAllTables = async (req: Request, res: Response) => {
     try {
-        const Tables = await TableModel.find();
-        res.status(200).json(Tables);
+        const tables = await TableModel.find();
+        res.status(200).json(tables);
     } catch (error) {
-        console.error("Error retrieving product items:", error);
-        res.status(500).json({ message: "Error retrieving product items", error });
+        console.error("Error retrieving tables:", error);
+        res.status(500).json({ message: "Error retrieving tables", error });
     }
 };
 
 export const getTableById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const Table = await TableModel.findOne({ id: id });
-        if (!Table) {
+        const table = await TableModel.findById(id);
+        if (!table) {
             res.status(404).json({ message: "Table not found" });
             return;
         }
-        res.status(200).json(Table);
+        res.status(200).json(table);
     } catch (error) {
-        console.error("Error retrieving Table:", error);
-        res.status(500).json({ message: "Error retrieving Table", error });
+        console.error("Error retrieving table:", error);
+        res.status(500).json({ message: "Error retrieving table", error });
     }
 };
-
 
 export const createTable = async (req: Request, res: Response): Promise<void> => {
     try {
         const { name, status, no, qr_code } = req.body;
-        const existingTable = await TableModel.findOne({ name });
+        const existingTable = await TableModel.findOne({ no });
         if (existingTable) {
-            res.status(400).json({ message: "Table with this name already exists" });
+            res.status(400).json({ message: "Table with this number already exists" });
             return;
         }
         const newTable = new TableModel({ name, status, no, qr_code });
         const savedTable = await newTable.save();
         res.status(201).json(savedTable);
     } catch (error) {
-        res.status(500).json({ message: "Error creating Table", error });
+        res.status(500).json({ message: "Error creating table", error });
     }
 };
 
 export const updateTable = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { id } = req.params; // This is the custom `id` field from the URL
+        const { id } = req.params;
         const { name, status, no, qr_code } = req.body;
 
-        // Check if a table with the same name already exists (excluding the current table)
+        // Check if a table with the same number already exists (excluding the current table)
         if (no) {
-            const existingTable = await TableModel.findOne({ no, id: { $ne: id } });
-
+            const existingTable = await TableModel.findOne({ no, _id: { $ne: id } });
             if (existingTable) {
-                res.status(400).json({ message: "Table with this no already exists" });
+                res.status(400).json({ message: "Table with this number already exists" });
                 return;
             }
         }
 
-        // Update the table using the custom `id` field
-        const updatedTable = await TableModel.findOneAndUpdate(
-            { id: id }, // Query by the custom `id` field
-            { name, status, no, qr_code }, // Fields to update
-            { new: true, runValidators: true } // Options: return the updated document and run validators
+        const updatedTable = await TableModel.findByIdAndUpdate(
+            id,
+            { name, status, no, qr_code },
+            { new: true, runValidators: true }
         );
 
         if (!updatedTable) {
@@ -72,22 +69,22 @@ export const updateTable = async (req: Request, res: Response): Promise<void> =>
 
         res.status(200).json(updatedTable);
     } catch (error) {
-        console.error("Error updating Table:", error);
-        res.status(500).json({ message: "Error updating Table", error });
+        console.error("Error updating table:", error);
+        res.status(500).json({ message: "Error updating table", error });
     }
 };
 
 export const deleteTable = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const deletedTable = await TableModel.findOneAndUpdate({ id: id }, { deleted_at: new Date() });
+        const deletedTable = await TableModel.findByIdAndUpdate(id, { deleted_at: new Date() });
         if (!deletedTable) {
             res.status(404).json({ message: "Table not found" });
             return;
         }
         res.status(200).json({ message: "Table deleted successfully" });
     } catch (error) {
-        console.error("Error deleting Table:", error);
-        res.status(500).json({ message: "Error deleting Table", error });
+        console.error("Error deleting table:", error);
+        res.status(500).json({ message: "Error deleting table", error });
     }
 };
