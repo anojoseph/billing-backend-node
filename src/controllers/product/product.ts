@@ -97,6 +97,7 @@ export const deleteProduct = async (req: Request, res: Response): Promise<void> 
         }
 
         product.status = false;
+        product.deleted_at = new Date();
         await product.save();
         res.status(200).json({ message: "Product deleted successfully", product });
     } catch (error: any) {
@@ -107,7 +108,7 @@ export const deleteProduct = async (req: Request, res: Response): Promise<void> 
 // Get all active products
 export const getAllProducts = async (req: Request, res: Response): Promise<void> => {
     try {
-        const products = await ProductModel.find({ status: true });
+        const products = await ProductModel.find({ status: true, deleted_at: null });
         if (products.length === 0) {
             res.status(404).json({ message: "No active products found" });
             return;
@@ -140,3 +141,39 @@ export const getProductById = async (req: Request, res: Response): Promise<void>
         res.status(500).json({ message: "Error fetching product", error: error.message });
     }
 };
+
+export const searchProducts = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { search, mealType, productItem } = req.query;
+        let filter: any = { status: true };
+
+        if (search) {
+            filter.name = { $regex: search, $options: "i" };
+        }
+        if (mealType) {
+            filter.mealType = mealType;
+        }
+        if (productItem) {
+            filter.type = productItem;
+        }
+
+        const products = await ProductModel.find(filter);
+
+        if (products.length === 0) {
+            res.status(200).json({ message: "No matching products found", data: [] });
+            return;
+        }
+
+        res.status(200).json({
+            message: "Products fetched successfully",
+            data: products.map(product => ({
+                ...product.toObject(),
+                image: product.image ? product.image.replace(/\\/g, "/") : null,
+            })),
+        });
+    } catch (error: any) {
+        res.status(500).json({ message: "Error fetching products", error: error.message });
+    }
+};
+
+

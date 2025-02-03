@@ -3,10 +3,9 @@ import TableModel from "../../models/table/table";
 
 export const getAllTables = async (req: Request, res: Response) => {
     try {
-        const tables = await TableModel.find();
+        const tables = await TableModel.find({ deleted_at: null });
         res.status(200).json(tables);
     } catch (error) {
-        console.error("Error retrieving tables:", error);
         res.status(500).json({ message: "Error retrieving tables", error });
     }
 };
@@ -21,7 +20,6 @@ export const getTableById = async (req: Request, res: Response) => {
         }
         res.status(200).json(table);
     } catch (error) {
-        console.error("Error retrieving table:", error);
         res.status(500).json({ message: "Error retrieving table", error });
     }
 };
@@ -69,7 +67,6 @@ export const updateTable = async (req: Request, res: Response): Promise<void> =>
 
         res.status(200).json(updatedTable);
     } catch (error) {
-        console.error("Error updating table:", error);
         res.status(500).json({ message: "Error updating table", error });
     }
 };
@@ -77,14 +74,13 @@ export const updateTable = async (req: Request, res: Response): Promise<void> =>
 export const deleteTable = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const deletedTable = await TableModel.findByIdAndUpdate(id, { deleted_at: new Date() });
+        const deletedTable = await TableModel.findByIdAndUpdate(id, { deleted_at: new Date(),status:false});
         if (!deletedTable) {
             res.status(404).json({ message: "Table not found" });
             return;
         }
         res.status(200).json({ message: "Table deleted successfully" });
     } catch (error) {
-        console.error("Error deleting table:", error);
         res.status(500).json({ message: "Error deleting table", error });
     }
 };

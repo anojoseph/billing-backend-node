@@ -3,10 +3,9 @@ import ProductItemModel from "../../models/product/produtcItem"; // Corrected th
 
 export const getAllProductItems = async (req: Request, res: Response) => {
     try {
-        const productItems = await ProductItemModel.find();
+        const productItems = await ProductItemModel.find({ deleted_at: null });
         res.status(200).json(productItems);
     } catch (error) {
-        console.error("Error retrieving product items:", error);
         res.status(500).json({ message: "Error retrieving product items", error });
     }
 };
@@ -21,7 +20,6 @@ export const getProductItemById = async (req: Request, res: Response) => {
         }
         res.status(200).json(productItem);
     } catch (error) {
-        console.error("Error retrieving product item:", error);
         res.status(500).json({ message: "Error retrieving product item", error });
     }
 };
@@ -33,7 +31,6 @@ export const createProductItem = async (req: Request, res: Response) => {
         const savedProductItem = await newProductItem.save();
         res.status(201).json(savedProductItem);
     } catch (error) {
-        console.error("Error creating product item:", error);
         res.status(500).json({ message: "Error creating product item", error });
     }
 };
@@ -55,7 +52,6 @@ export const updateProductItem = async (req: Request, res: Response) => {
 
         res.status(200).json(updatedProductItem);
     } catch (error) {
-        console.error("Error updating product item:", error);
         res.status(500).json({ message: "Error updating product item", error });
     }
 };
@@ -65,7 +61,7 @@ export const deleteProductItem = async (req: Request, res: Response) => {
         const { id } = req.params;
         const deletedProductItem = await ProductItemModel.findByIdAndUpdate(
             id,
-            { deleted_at: new Date() },
+            { deleted_at: new Date(), status: false },
             { new: true }
         );
         if (!deletedProductItem) {
@@ -74,7 +70,6 @@ export const deleteProductItem = async (req: Request, res: Response) => {
         }
         res.status(200).json({ message: "Product item deleted successfully" });
     } catch (error) {
-        console.error("Error deleting product item:", error);
         res.status(500).json({ message: "Error deleting product item", error });
     }
 };

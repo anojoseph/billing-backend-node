@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { getAllProductItems, getProductItemById, createProductItem, updateProductItem, deleteProductItem } from '../../controllers/product/productItemController';
 import { getAllMealTypes, getMealTypeById, createMealType, updateMealType, deleteMealType } from '../../controllers/product/mealType';
-import { createProduct, updateProduct, deleteProduct, getAllProducts, getProductById } from '../../controllers/product/product';
+import { createProduct, updateProduct, deleteProduct, getAllProducts, getProductById, searchProducts } from '../../controllers/product/product';
 
 const router = express.Router();
 
@@ -47,6 +47,7 @@ router.patch("/meal-type/:id", updateMealType);
 router.delete("/meal-type/:id", deleteMealType);
 
 router.get("/product", getAllProducts);
+router.get("/product/search", searchProducts);
 router.get("/product/:id", getProductById);
 router.post("/product", upload.single('image'), createProduct); // Adding image upload here
 router.patch("/product/:id", upload.single('image'), updateProduct); // Adding image upload here

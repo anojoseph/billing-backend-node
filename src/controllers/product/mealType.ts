@@ -3,7 +3,7 @@ import MealTypeModel from "../../models/product/mealType";
 
 export const getAllMealTypes = async (req: Request, res: Response) => {
     try {
-        const MealTypes = await MealTypeModel.find();
+        const MealTypes = await MealTypeModel.find({deleted_at:null});
         res.status(200).json(MealTypes);
     } catch (error) {
         res.status(500).json({ message: "Error retrieving product items", error });
@@ -20,7 +20,6 @@ export const getMealTypeById = async (req: Request, res: Response) => {
         }
         res.status(200).json(MealType);
     } catch (error) {
-        console.error("Error retrieving meal type:", error);
         res.status(500).json({ message: "Error retrieving meal type", error });
     }
 };
@@ -74,7 +73,7 @@ export const updateMealType = async (req: Request, res: Response) => {
 export const deleteMealType = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const deletedMealType = await MealTypeModel.findByIdAndUpdate(id, { deleted_at: new Date() });
+        const deletedMealType = await MealTypeModel.findByIdAndUpdate(id, { deleted_at: new Date(),status:false });
         if (!deletedMealType) {
             res.status(404).json({ message: "Meal type not found" });
             return;
