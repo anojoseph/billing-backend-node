@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 interface TableModel extends Document {
+    _id: string;
     no: number;
     name: string;
     status: boolean;

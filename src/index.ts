@@ -3,13 +3,16 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/auth/authRoute";
 import productRoute from "./routes/product/product";
 import tableRoute from "./routes/table/table";
+import orderRoute from "./routes/orders/order"
+import settingsRoutes from './routes/settings/settings.routes';
+import reportRoutes from './routes/reports/report.routes';
+
 
 import mongoose from "mongoose";
 import { authMiddleware } from "./middlewares/auth/auth";
 import datatableRoutes from './routes/datatable/datatableRoute';
 import cors from 'cors';
 import path from 'path';
-import fs from 'fs';
 
 dotenv.config();
 const app = express();
@@ -45,6 +48,9 @@ app.use(authMiddleware);
 app.use('/data-table', datatableRoutes);
 app.use("/product", productRoute);
 app.use("/table", tableRoute);
+app.use('/order', orderRoute);
+app.use('/settings', settingsRoutes);
+app.use('/reports', reportRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
