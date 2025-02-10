@@ -108,7 +108,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
             await newBill.save({ session });
 
             // Optionally, print the order
-            await printOrder(newOrder as any);
+            // await printOrder(newOrder as any);
         }
 
         await session.commitTransaction();
@@ -206,7 +206,7 @@ export const completeOrder = async (req: Request, res: Response): Promise<void> 
         await newBill.save({ session });
 
         await session.commitTransaction();
-        await printOrder(order as any);
+        // await printOrder(order as any);
         res.status(200).json({ message: 'Order marked as completed and bill created', bill: newBill });
     } catch (error: any) {
         await session.abortTransaction();
