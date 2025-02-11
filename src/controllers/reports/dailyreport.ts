@@ -4,9 +4,7 @@ import Bill from '../../models/bill/bill'; // Import the Bill model
 export const getBillWiseSalesReport = async (req: Request, res: Response): Promise<void> => {
     try {
         const { startDate, endDate, type } = req.query;
-        console.log('Query Parameters:', { startDate, endDate, type });
 
-        // Validate startDate and endDate
         if (!startDate || !endDate) {
             res.status(400).json({ message: 'startDate and endDate are required' });
             return;
@@ -42,6 +40,7 @@ export const getBillWiseSalesReport = async (req: Request, res: Response): Promi
             {
                 $project: {
                     _id: 1, // Include bill ID
+                    billNumber: 1,
                     orderId: 1, // Include order ID
                     tableId: 1, // Include table ID
                     totalAmount: 1, // Include total amount

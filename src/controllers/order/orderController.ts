@@ -90,6 +90,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
             orderType,
             items: processedItems,
             totalAmount,
+            status: orderType === 'Takeaway' || orderType === 'Bill' ? 'completed' : 'pending'
         });
 
         await newOrder.save({ session });
@@ -101,7 +102,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                 tableId: newOrder.tableId,
                 items: newOrder.items,
                 totalAmount: newOrder.totalAmount,
-                type:orderType,
+                type: orderType
                 // Add other fields as necessary
             });
 
@@ -217,6 +218,164 @@ export const completeOrder = async (req: Request, res: Response): Promise<void> 
         } else {
             res.status(500).json({ message: 'Internal server error' });
         }
+    } finally {
+        session.endSession();
+    }
+};
+
+
+export const updateBillAndOrder = async (req: Request, res: Response) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    const settings = await Settings.findOne();
+    const stockUpdateNeeded = settings?.stockUpdate ?? false;
+
+    try {
+        const { billNumber } = req.body;
+        const { items } = req.body; // Updated items (existing & new)
+        const bill = await Bill.findOne({ billNumber }).session(session);
+        if (!bill) {
+            await session.abortTransaction();
+            return res.status(404).json({ message: "Bill not found" });
+        }
+        const orders = await Order.findById(bill.orderId);
+        const order = await Order.findById(bill.orderId).session(session);
+        if (!order) {
+            await session.abortTransaction();
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        let totalAmount = 0;
+        const updatedItems = [];
+
+        for (const item of items) {
+            const { id, quantity, price } = item;
+
+            // Find the product
+            const product = await Product.findById(id).session(session);
+            if (!product) {
+                await session.abortTransaction();
+                return res.status(404).json({ message: `Product with id ${id} not found` });
+            }
+
+            // Check stock
+            if (stockUpdateNeeded) {
+                if (quantity > product.qty) {
+                    await session.abortTransaction();
+                    return res.status(400).json({ message: `Not enough stock for ${product.name}` });
+                }
+                product.qty -= quantity;
+            }
+
+            // Deduct stock if needed
+
+            await product.save({ session });
+
+            const totalPrice = quantity * price;
+            totalAmount += totalPrice;
+
+            updatedItems.push({
+                id: new mongoose.Types.ObjectId(id),
+                quantity,
+                price,
+                totalPrice
+            });
+        }
+
+        // Update the order
+        (order.items as any) = updatedItems; // ✅ Fix applied
+        order.totalAmount = totalAmount;
+        await order.save({ session });
+
+        // Update the bill
+        (bill.items as any) = updatedItems; // ✅ Fix applied
+        bill.totalAmount = totalAmount;
+        await bill.save({ session });
+
+        await session.commitTransaction();
+        res.status(200).json({ message: "Bill and Order updated successfully", bill });
+
+    } catch (error) {
+        await session.abortTransaction();
+        console.error("Error updating bill/order:", error);
+        res.status(500).json({ message: "Internal server error" });
+    } finally {
+        session.endSession();
+    }
+};
+
+
+export const getBillByNumber = async (req: Request, res: Response) => {
+    try {
+        const { billNumber } = req.params;
+
+        const bill = await Bill.findOne({ billNumber, deleted_at: null }).populate("orderId");
+
+        if (!bill) {
+            return res.status(404).json({ message: "Bill not found" });
+        }
+
+        res.status(200).json({ bill });
+    } catch (error) {
+        console.error("Error fetching bill:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const deleteBillAndOrder = async (req: Request, res: Response) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { billNumber } = req.params;
+        let deletedBy: string | null = req.user?.id || null;
+
+        // Validate deletedBy
+        if (deletedBy && !mongoose.Types.ObjectId.isValid(deletedBy)) {
+            console.warn("Invalid deletedBy value received:", deletedBy);
+            deletedBy = null; // Prevent MongoDB CastError
+        } else if (deletedBy) {
+            deletedBy = new mongoose.Types.ObjectId(deletedBy).toString(); // Convert to string
+        }
+
+        const bill = await Bill.findOne({ billNumber, deleted_at: null }).session(session);
+        if (!bill) {
+            await session.abortTransaction();
+            return res.status(404).json({ message: "Bill not found or already deleted" });
+        }
+
+        const order = await Order.findById(bill.orderId).session(session);
+        if (!order || order.deleted_at) {
+            await session.abortTransaction();
+            return res.status(404).json({ message: "Order not found or already deleted" });
+        }
+
+        // Restore stock if needed
+        const settings = await Settings.findOne();
+        const stockUpdateNeeded = settings?.stockUpdate ?? false;
+
+        if (stockUpdateNeeded) {
+            for (const item of bill.items) {
+                const product = await Product.findById(item.id).session(session);
+                if (product) {
+                    product.qty += item.quantity; // Restore stock
+                    await product.save({ session });
+                }
+            }
+        }
+
+        // Soft delete bill and order
+        await Order.findByIdAndUpdate(order._id, { deleted_at: new Date(), deleted_by: deletedBy }, { session });
+        await Bill.findByIdAndUpdate(bill._id, { deleted_at: new Date(), deleted_by: deletedBy }, { session });
+
+        await session.commitTransaction();
+        res.status(200).json({ message: "Bill and Order soft deleted successfully" });
+
+    } catch (error) {
+        await session.abortTransaction();
+        console.error("Error deleting bill/order:", error);
+        res.status(500).json({ message: "Internal server error" });
     } finally {
         session.endSession();
     }
