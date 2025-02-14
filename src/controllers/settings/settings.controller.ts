@@ -40,7 +40,6 @@ export const getSettings = async (req: Request, res: Response, next: NextFunctio
 export const updateSettings = [
     upload.single('logo'), // Middleware to handle file upload
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        console.log("it is working");
 
         try {
             let settings = await Settings.findOne();

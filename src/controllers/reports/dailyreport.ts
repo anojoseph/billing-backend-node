@@ -30,8 +30,6 @@ export const getBillWiseSalesReport = async (req: Request, res: Response): Promi
             matchStage.type = type;
         }
 
-        console.log('Match Stage:', matchStage); // Log the match stage for debugging
-
         // Generate the bill-wise sales report using aggregation
         const billWiseReport = await Bill.aggregate([
             {
@@ -52,8 +50,6 @@ export const getBillWiseSalesReport = async (req: Request, res: Response): Promi
                 $sort: { createdAt: 1 }, // Sort bills by creation date
             },
         ]);
-
-        console.log('Bill-wise Report:', billWiseReport); // Log the report for debugging
 
         // Calculate the total amount summary
         const totalAmountSummary = billWiseReport.reduce((sum, bill) => sum + bill.totalAmount, 0);

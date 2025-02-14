@@ -6,6 +6,7 @@ const allowedFields: Record<string, string[]> = {
     MealType: ['_id', 'name', 'status'],
     Table: ['_id', 'name', 'no', 'status', 'qr_code'],
     Product: ['_id', 'name', 'price', 'mealType', 'type', 'ingredients', 'qty','status'],
+    Kitchen:['_id','name','status']
 };
 
 export const getItems = async (req: Request, res: Response): Promise<void> => {
