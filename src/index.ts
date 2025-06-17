@@ -7,6 +7,7 @@ import orderRoute from "./routes/orders/order"
 import settingsRoutes from './routes/settings/settings.routes';
 import reportRoutes from './routes/reports/report.routes';
 import kitchenRoutes from "./routes/kitchen/kitchenRoutes";
+import port from "./routes/port/port"
 
 
 import mongoose from "mongoose";
@@ -53,6 +54,7 @@ app.use('/order', orderRoute);
 app.use('/settings', settingsRoutes);
 app.use('/reports', reportRoutes);
 app.use("/kitchens", kitchenRoutes);
+app.use("/ports", port);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

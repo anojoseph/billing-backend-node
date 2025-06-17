@@ -5,6 +5,7 @@ import Settings from '../../models/settings/setting';
 import Bill from '../../models/bill/bill';
 import mongoose from 'mongoose';
 import { printOrder } from '../../services/printService';
+import { printKitchenTickets } from "../kitchen/kot";
 
 interface OrderItem {
     id: string;
@@ -117,6 +118,9 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
             message: 'Order created successfully',
             order: newOrder
         });
+
+       
+            await printKitchenTickets(newOrder._id); //printing order
 
     } catch (error) {
         await session.abortTransaction();

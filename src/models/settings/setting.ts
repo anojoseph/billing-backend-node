@@ -5,6 +5,7 @@ export interface ISettings extends Document {
     logo: string;
     status: boolean;
     stockUpdate: boolean;
+    printerPort:string
 }
 
 const SettingsSchema: Schema = new Schema({
@@ -12,6 +13,7 @@ const SettingsSchema: Schema = new Schema({
     logo: { type: String, required: false },
     status: { type: Boolean, default: true },
     stockUpdate: { type: Boolean, default: false },
+     printerPort: { type: String, required: false } // <- NEW
 });
 
 export default mongoose.model<ISettings>('Settings', SettingsSchema);
