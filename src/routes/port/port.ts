@@ -1,13 +1,13 @@
-import express from 'express';
-import { getSerialPorts } from '../../controllers/port/serialPortController';
+// import express from 'express';
+// import { getSerialPorts } from '../../controllers/port/serialPortController';
 
-const router = express.Router();
+// const router = express.Router();
 
-// Route for creating an order
-router.get('/serialports', getSerialPorts);
-
-
+// // Route for creating an order
+// router.get('/serialports', getSerialPorts);
 
 
 
-export default router;
+
+
+// export default router;
