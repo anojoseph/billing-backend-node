@@ -4,46 +4,9 @@ import Kitchen from "../../models/kitchen/Kitchen";
 import Table from "../../models/table/table"
 import Settings from "../../models/settings/setting";
 
-const { SerialPort } = require("serialport");
 const { ThermalPrinter, PrinterTypes } = require("node-thermal-printer");
 
-SerialPort.list().then((ports: any) => {
-    console.log("Available Serial Ports:");
-    console.log(ports);
-});
 
-
-
-async function isPortAvailable(portPath: any) {
-    try {
-        const ports = await SerialPort.list();
-        return ports.some((port: any) =>
-            port.path === portPath);
-    } catch (error) {
-        console.error("Error while retrieving port list.", error);
-        return false;
-    }
-}
-(async () => {
-    const settings = await Settings.findOne();
-    if (!settings) {
-        console.error("Settings not configured.");
-        return;
-    }
-
-    const port = settings?.printerPort;
-    if (!port) {
-        console.error("Printer port is not set in settings.");
-        return;
-    }
-    //const port =  settings?.printerPort;
-
-    if (await isPortAvailable(port)) {
-        console.log(`Port ${port} is connected — printer might be connected.`);
-    } else {
-        console.log(`Port ${port} is not connected — printer might be disconnected.`);
-    }
-})();
 async function printKitchenTickets(orderId: any) {
     // 1️⃣ Find the order first
     const order = await Order.findById(orderId);
@@ -114,30 +77,6 @@ async function printKitchenTickets(orderId: any) {
             return { printContent: allTickets.trim() };
         }
 
-        // Printing to printer (Optionally)
-        if (await isPortAvailable(port)) {
-            console.log("Port is available. Attempting to print.");
-
-            try {
-                let printer = new ThermalPrinter({
-                    type: PrinterTypes.EPSON,
-                    interface: port,
-                    removeSpecialCharacters: false
-                });
-
-                printer.print(ticket);
-                printer.cut();
-
-                await printer.execute();
-
-                console.log(`Printed KOT for ${data.kitchenName}.`);
-
-            } catch (error) {
-                console.error(`Error while printing KOT for ${data.kitchenName}.`, error);
-            }
-        } else {
-            console.error(`Port ${port} not connected. Please check your connection.`);
-        }
     }
 
     return { printContent: allTickets.trim() };
