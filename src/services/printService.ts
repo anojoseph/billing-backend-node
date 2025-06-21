@@ -1,33 +1,56 @@
-import printer from '../config/printerConfig';
+import Settings from "../models/settings/setting";
+import Product from '../models/product/product';
 
-interface OrderItem {
-    name: string;
-    quantity: number;
-    totalPrice: number;
-}
+export async function printOrder(order: any, bill?: any): Promise<string> {
+    const settings = await Settings.findOne();
+    if (!settings) throw new Error("Settings not configured.");
 
-interface Order {
-    items: OrderItem[];
-    totalAmount: number;
-}
+    const lineWidth = 40;
+    const divider = "=".repeat(lineWidth);
+    const lineDivider = "-".repeat(lineWidth);
 
-export const printOrder = async (order: Order): Promise<void> => {
-    try {
-        printer.alignCenter();
-        printer.println('Order Receipt');
-        printer.drawLine();
-
-        order.items.forEach((item) => {
-            printer.println(`${item.name} x${item.quantity} - $${item.totalPrice.toFixed(2)}`);
-        });
-
-        printer.drawLine();
-        printer.println(`Total: $${order.totalAmount.toFixed(2)}`);
-        printer.cut();
-
-        await printer.execute();
-        console.log('Print job executed, output written to file.');
-    } catch (error) {
-        console.error('Error during printing:', error);
+    function centerAlign(text: string, width: number): string {
+        if (text.length >= width) return text;
+        const padSize = Math.floor((width - text.length) / 2);
+        return ' '.repeat(padSize) + text;
     }
-};
+
+    let printContent = "";
+    printContent += divider + "\n";
+    printContent += centerAlign(settings.storeName, lineWidth) + "\n";
+    printContent += divider + "\n";
+
+    const dateStr = new Date().toLocaleString();
+    printContent += bill
+        ? `Bill No : ${bill.billNumber}\n`
+        : `Order No: ${order.orderNumber}\n`;
+    printContent += `Date    : ${dateStr}\n`;
+    printContent += `Type    : ${order.orderType}\n`;
+    printContent += lineDivider + "\n";
+
+    printContent += "Item".padEnd(18) + " " +
+        "Qty".padStart(3) + " " +
+        "Price".padStart(6) + " " +
+        "Total".padStart(7) + "\n";
+    printContent += lineDivider + "\n";
+
+    for (const item of order.items) {
+        const product = await Product.findById(item.id);
+        let productName = product ? product.name : 'Unknown';
+        if (productName.length > 18) {
+            productName = productName.substring(0, 18);
+        }
+        const qtyStr = String(item.quantity).padStart(3, ' ');
+        const priceStr = item.price.toFixed(2).padStart(6, ' ');
+        const totalStr = item.totalPrice.toFixed(2).padStart(7, ' ');
+        printContent += productName.padEnd(18) + " " + qtyStr + " " + priceStr + " " + totalStr + "\n";
+    }
+
+    printContent += lineDivider + "\n";
+    printContent += "Total:".padEnd(28) + order.totalAmount.toFixed(2).padStart(7, ' ') + "\n";
+    printContent += divider + "\n";
+    printContent += centerAlign("Thank You!", lineWidth) + "\n";
+    printContent += divider + "\n";
+
+    return printContent;
+}

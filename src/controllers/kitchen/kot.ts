@@ -44,34 +44,17 @@ async function isPortAvailable(portPath: any) {
         console.log(`Port ${port} is not connected — printer might be disconnected.`);
     }
 })();
-
 async function printKitchenTickets(orderId: any) {
-
     // 1️⃣ Find the order first
     const order = await Order.findById(orderId);
-    console.log(order)
     if (!order) {
         console.error("Order not found.");
-        return;
-    }
-
-    const settings = await Settings.findOne();
-    if (!settings) {
-        console.error("Settings not configured.");
-        return;
-    }
-
-    const port = settings?.printerPort;
-    if (!port) {
-        console.error("Printer port is not set in settings.");
-        return;
+        return { printContent: '' };
     }
 
 
-    //printerPort
-    
 
-    // 2️⃣ Gather products by their respective kitchen
+    // Gather products by their respective kitchen
     const itemsByKitchen: Record<string, {
         kitchenId: string;
         kitchenName: string;
@@ -98,16 +81,13 @@ async function printKitchenTickets(orderId: any) {
                 };
             }
 
-            itemsByKitchen[kitchenId].items.push({
-                productName: product.name,
-                quantity: item.quantity
-            });
+            itemsByKitchen[kitchenId].items.push({ productName: product.name, quantity: item.quantity });
         }
     }
 
-    // Loop through each group and print
+    let allTickets = '';
+    // Loop through each group and format KOT
     for (const [kitchenId, data] of Object.entries(itemsByKitchen)) {
-        // Format KOT
         let tableName = '';
         if (order.orderType === 'Dine-in') {
             const table = await Table.findById(order.tableId);
@@ -115,25 +95,34 @@ async function printKitchenTickets(orderId: any) {
         } else if (order.orderType === 'Takeaway') {
             tableName = "Takeaway Order";
         }
-
-        const ticket = `=== KOT for ${data.kitchenName} ===\nTable: ${tableName}\n${data.items.map((item) => `${item.quantity} x ${item.productName}`).join('\n')}\n===============\n`;
+        const printTime = formatDateTime();
+        const ticket = `=== KOT for ${data.kitchenName} ===\nTime: ${printTime}\nTable: ${tableName}\n${data.items.map((item) => `${item.quantity} x ${item.productName}`).join('\n')}\n===============\n`;
 
         console.log(ticket);
+        allTickets += ticket;
 
-        //const port = "COM3";
+        const settings = await Settings.findOne();
+        if (!settings) {
+            console.error("Settings not configured.");
+            return { printContent: allTickets.trim() };
+        }
 
-        console.log(`Checking if port ${port} is connected (means printer is connected)…`);
-        console.log(await isPortAvailable(port), '==========');
+        const port = settings.printerPort;
+
+        if (!port) {
+            console.error("Printer port is not set in settings.");
+            return { printContent: allTickets.trim() };
+        }
+
+        // Printing to printer (Optionally)
         if (await isPortAvailable(port)) {
-            console.log(await isPortAvailable(port), '============')
             console.log("Port is available. Attempting to print.");
-
 
             try {
                 let printer = new ThermalPrinter({
                     type: PrinterTypes.EPSON,
-                    interface: port, //port, // e.g. COM5 or /dev/rfcomm0
-                    removeSpecialCharacters: false,
+                    interface: port,
+                    removeSpecialCharacters: false
                 });
 
                 printer.print(ticket);
@@ -142,19 +131,23 @@ async function printKitchenTickets(orderId: any) {
                 await printer.execute();
 
                 console.log(`Printed KOT for ${data.kitchenName}.`);
-                return true;
 
             } catch (error) {
                 console.error(`Error while printing KOT for ${data.kitchenName}.`, error);
-                return false;
             }
         } else {
-            console.error(`Port ${port} not connected. Please check your Bluetooth connection.`);
-            return false;
+            console.error(`Port ${port} not connected. Please check your connection.`);
         }
     }
 
-
+    return { printContent: allTickets.trim() };
 }
+function formatDateTime() {
+    const now = new Date();
+    return now.toLocaleString('en-GB', { hour12: true }); // For dd/MM/yyyy, hh:mm:ss AM/PM
+}
+
+
+
 
 export { printKitchenTickets };

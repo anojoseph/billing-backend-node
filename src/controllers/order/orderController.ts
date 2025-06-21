@@ -74,7 +74,8 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                     }
                 });
 
-                existingOrder.totalAmount += totalAmount;
+                existingOrder.totalAmount += totalAmount
+
                 await existingOrder.save({ session });
 
                 await session.commitTransaction();
@@ -85,17 +86,25 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                 return;
             }
         }
+        const lastOrder = await Order.findOne().sort({ created_at: -1 });
+        const nextOrderNumber = lastOrder?.orderNumber
+            ? `ORD-${String(parseInt(lastOrder.orderNumber.split('-')[1]) + 1).padStart(4, '0')}`
+            : 'ORD-0001';
 
         const newOrder = new Order({
             tableId: orderType === 'Dine-in' ? tableId : null,
             orderType,
             items: processedItems,
             totalAmount,
-            status: orderType === 'Takeaway' || orderType === 'Bill' ? 'completed' : 'pending'
+            status: orderType === 'Takeaway' || orderType === 'Bill' ? 'completed' : 'pending',
+            orderNumber: nextOrderNumber,
         });
 
         await newOrder.save({ session });
 
+
+
+        let printContent = '';
         // If the order type is 'Takeaway' or 'Bill', create a corresponding bill
         if (orderType === 'Takeaway' || orderType === 'Bill') {
             const newBill = new Bill({
@@ -103,24 +112,34 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                 tableId: newOrder.tableId,
                 items: newOrder.items,
                 totalAmount: newOrder.totalAmount,
-                type: orderType
+                type: orderType,
+                orderNumber: nextOrderNumber,
                 // Add other fields as necessary
             });
 
-            await newBill.save({ session });
 
+            await newBill.save({ session });
+            printContent = await printOrder(newOrder as any, newBill);
             // Optionally, print the order
             // await printOrder(newOrder as any);
         }
 
         await session.commitTransaction();
-        res.status(201).json({
-            message: 'Order created successfully',
-            order: newOrder
-        });
+        if (orderType === 'Takeaway' || orderType === 'Bill') {
+            res.status(201).json({
+                message: 'Order created successfully',
+                order: newOrder,
+                ...(printContent && { printContent })
+            });
+        }
+        else {
+            res.status(201).json({
+                message: 'Order created successfully',
+                order: newOrder,
+            });
+        }
 
-       
-            await printKitchenTickets(newOrder._id); //printing order
+        await printKitchenTickets(newOrder._id); //printing order
 
     } catch (error) {
         await session.abortTransaction();
@@ -175,6 +194,58 @@ export const updateOrder = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
+// export const completeOrder = async (req: Request, res: Response): Promise<void> => {
+//     const session = await mongoose.startSession();
+//     session.startTransaction();
+
+//     try {
+//         const { orderId } = req.params;
+
+//         if (!mongoose.Types.ObjectId.isValid(orderId)) {
+//             res.status(400).json({ message: 'Invalid order ID format' });
+//             return;
+//         }
+
+//         const order = await Order.findById(orderId).session(session);
+
+//         if (!order) {
+//             res.status(404).json({ message: 'Order not found' });
+//             return;
+//         }
+
+//         // Update order status to 'completed'
+//         order.status = 'completed';
+//         await order.save({ session });
+
+//         // Create a new bill based on the completed order
+//         const newBill = new Bill({
+//             orderId: order._id,
+//             tableId: order.tableId,
+//             items: order.items,
+//             totalAmount: order.totalAmount,
+//             type: order.orderType,
+//             // Add other fields as necessary
+//         });
+
+//         await newBill.save({ session });
+
+//         await session.commitTransaction();
+//         // await printOrder(order as any);
+//         res.status(200).json({ message: 'Order marked as completed and bill created', bill: newBill });
+//     } catch (error: any) {
+//         await session.abortTransaction();
+//         console.error('Error completing order:', error);
+
+//         if (error.name === 'CastError') {
+//             res.status(400).json({ message: 'Invalid order ID' });
+//         } else {
+//             res.status(500).json({ message: 'Internal server error' });
+//         }
+//     } finally {
+//         session.endSession();
+//     }
+// };
+
 export const completeOrder = async (req: Request, res: Response): Promise<void> => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -194,25 +265,41 @@ export const completeOrder = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // Update order status to 'completed'
+        // ✅ Ensure orderNumber exists
+        if (!order.orderNumber) {
+            const lastOrder = await Order.findOne().sort({ created_at: -1 });
+            const nextOrderNumber = lastOrder?.orderNumber
+                ? `ORD-${String(parseInt(lastOrder.orderNumber.split('-')[1]) + 1).padStart(4, '0')}`
+                : 'ORD-0001';
+            order.orderNumber = nextOrderNumber;
+        }
+
+        // ✅ Update status
         order.status = 'completed';
         await order.save({ session });
 
-        // Create a new bill based on the completed order
+        // ✅ Create Bill
         const newBill = new Bill({
             orderId: order._id,
             tableId: order.tableId,
             items: order.items,
             totalAmount: order.totalAmount,
             type: order.orderType,
-            // Add other fields as necessary
+            orderNumber: order.orderNumber,
         });
 
         await newBill.save({ session });
 
+        // ✅ Print Invoice
+        const printContent = await printOrder(order as any, newBill); // Ensure `printOrder` handles formatting
+
         await session.commitTransaction();
-        // await printOrder(order as any);
-        res.status(200).json({ message: 'Order marked as completed and bill created', bill: newBill });
+
+        res.status(200).json({
+            message: 'Order marked as completed and bill created',
+            bill: newBill,
+            printContent, // ✅ return this to frontend
+        });
     } catch (error: any) {
         await session.abortTransaction();
         console.error('Error completing order:', error);
@@ -226,7 +313,6 @@ export const completeOrder = async (req: Request, res: Response): Promise<void> 
         session.endSession();
     }
 };
-
 
 export const updateBillAndOrder = async (req: Request, res: Response) => {
     const session = await mongoose.startSession();
@@ -327,7 +413,7 @@ export const getBillByNumber = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteBillAndOrder = async (req: Request, res: Response) => {
+export const deleteBillAndOrder = async (req: any, res: Response) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 

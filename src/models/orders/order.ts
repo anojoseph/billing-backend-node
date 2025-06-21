@@ -3,6 +3,7 @@ import mongoose, { Schema, model, Document, Types } from 'mongoose';
 interface IOrder extends Document {
     tableId?: Types.ObjectId;
     orderType: 'Dine-in' | 'Takeaway' | 'Bill';
+    orderNumber:string;
     items: Array<{
         id: Types.ObjectId;
         quantity: number;
@@ -27,6 +28,7 @@ const OrderSchema = new Schema({
         }
     },
     orderType: { type: String, enum: ['Dine-in', 'Takeaway', 'Bill'], required: true },
+    orderNumber: { type: String, required: false, unique: true },
     items: [{
         id: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
         quantity: { type: Number, required: true },
