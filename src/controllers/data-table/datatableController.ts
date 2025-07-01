@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 const allowedFields: Record<string, string[]> = {
     ProductItem: ['_id', 'name', 'status'],
     MealType: ['_id', 'name', 'status'],
-    Table: ['_id', 'name', 'no', 'status', 'qr_code'],
+    Table: ['_id', 'name', 'no', 'status'],
     Product: ['_id', 'name', 'price', 'mealType', 'type', 'ingredients', 'qty','status'],
     Kitchen:['_id','name','status']
 };

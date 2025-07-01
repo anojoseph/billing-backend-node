@@ -7,6 +7,7 @@ import orderRoute from "./routes/orders/order"
 import settingsRoutes from './routes/settings/settings.routes';
 import reportRoutes from './routes/reports/report.routes';
 import kitchenRoutes from "./routes/kitchen/kitchenRoutes";
+import menuRoutes from './routes/menu/menu.routes';
 //import port from "./routes/port/port"
 
 
@@ -54,6 +55,7 @@ app.use('/order', orderRoute);
 app.use('/settings', settingsRoutes);
 app.use('/reports', reportRoutes);
 app.use("/kitchens", kitchenRoutes);
+app.use('/menu', menuRoutes);
 //app.use("/ports", port);
 
 app.listen(PORT, () => {

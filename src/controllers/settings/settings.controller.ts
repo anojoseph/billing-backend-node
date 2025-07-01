@@ -53,6 +53,7 @@ export const updateSettings = [
             settings.storeName = req.body.storeName;
             settings.status = req.body.status === 'true'; // Convert to boolean
             settings.stockUpdate = req.body.stockUpdate === 'true';
+            settings.accept_qr_booking = req.body.accept_qr_booking === 'true';
 
             // Handle file upload
             if (req.file) {

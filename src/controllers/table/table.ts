@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import TableModel from "../../models/table/table";
+import QRCode from "qrcode";
 
 export const getAllTables = async (req: Request, res: Response) => {
     try {
@@ -34,6 +35,12 @@ export const createTable = async (req: Request, res: Response): Promise<void> =>
         }
         const newTable = new TableModel({ name, status, no, qr_code });
         const savedTable = await newTable.save();
+        
+          const qrData = `${process.env.FRONTEND_URL}/order/table/${savedTable._id}`;
+        const qrImage = await QRCode.toDataURL(qrData);
+
+        savedTable.qr_code = qrImage;
+        await savedTable.save();
         res.status(201).json(savedTable);
     } catch (error) {
         res.status(500).json({ message: "Error creating table", error });

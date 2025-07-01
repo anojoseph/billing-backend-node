@@ -20,7 +20,8 @@ const billSchema = new mongoose.Schema({
     },
     createdAt: { type: Date, default: Date.now },
     deleted_at: { type: Date, default: null }, // Soft delete field
-    deleted_by: { type: String, ref: 'User', default: null }
+    deleted_by: { type: String, ref: 'User', default: null },
+    payment_type:{type: String, required: false}
 });
 
 // Middleware to auto-generate bill number starting from 1001
