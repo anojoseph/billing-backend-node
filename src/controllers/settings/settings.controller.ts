@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import Settings from '../../models/settings/setting';
 import multer from 'multer';
-import path from 'path';
 
 // Configure multer storage
 const storage = multer.diskStorage({
@@ -54,6 +53,8 @@ export const updateSettings = [
             settings.status = req.body.status === 'true'; // Convert to boolean
             settings.stockUpdate = req.body.stockUpdate === 'true';
             settings.accept_qr_booking = req.body.accept_qr_booking === 'true';
+            settings.show_available_qty = req.body.show_available_qty === 'true';
+
 
             // Handle file upload
             if (req.file) {

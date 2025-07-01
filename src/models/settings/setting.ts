@@ -7,6 +7,7 @@ export interface ISettings extends Document {
     stockUpdate: boolean;
     printerPort:string;
     accept_qr_booking:boolean;
+    show_available_qty:boolean;
 }
 
 const SettingsSchema: Schema = new Schema({
@@ -15,7 +16,9 @@ const SettingsSchema: Schema = new Schema({
     status: { type: Boolean, default: true },
     stockUpdate: { type: Boolean, default: false },
     printerPort: { type: String, required: false },
-    accept_qr_booking: { type: Boolean, required: false }
+    accept_qr_booking: { type: Boolean, required: false },
+    show_available_qty: { type: Boolean, required: false }
+
 });
 
 export default mongoose.model<ISettings>('Settings', SettingsSchema);

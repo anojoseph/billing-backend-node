@@ -1,9 +1,10 @@
-import express from 'express';
+import express, { RequestHandler } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { getAllProductItems, getProductItemById, createProductItem, updateProductItem, deleteProductItem } from '../../controllers/product/productItemController';
+import { getAllProductItems, getProductItemById, createProductItem, updateProductItem, deleteProductItem, bulkUploadProducts } from '../../controllers/product/productItemController';
 import { getAllMealTypes, getMealTypeById, createMealType, updateMealType, deleteMealType } from '../../controllers/product/mealType';
 import { createProduct, updateProduct, deleteProduct, getAllProducts, getProductById, searchProducts } from '../../controllers/product/product';
+import uploadExcel from "../../utils/multerExcel";
 
 const router = express.Router();
 
@@ -52,5 +53,7 @@ router.get("/product/:id", getProductById);
 router.post("/product", upload.single('image'), createProduct); // Adding image upload here
 router.patch("/product/:id", upload.single('image'), updateProduct); // Adding image upload here
 router.delete("/product/:id", deleteProduct);
+
+router.post("/bulk-upload", uploadExcel.single("file"), bulkUploadProducts as RequestHandler);
 
 export default router;

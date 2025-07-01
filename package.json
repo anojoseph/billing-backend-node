@@ -23,7 +23,8 @@
     "node-thermal-printer": "^4.4.3",
     "pdfkit": "^0.16.0",
     "qrcode": "^1.5.4",
-    "uuid": "^11.0.5"
+    "uuid": "^11.0.5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
