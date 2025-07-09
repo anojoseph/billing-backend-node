@@ -1,5 +1,61 @@
 import Settings from "../models/settings/setting";
 import Product from '../models/product/product';
+import fs from 'fs';
+const CONFIG_FILE = './printer-config.json';
+import net from 'net';
+import escpos from 'escpos';
+
+escpos.USB = require('escpos-usb'); // required for USB printing
+
+function sendToUSBPrinter(printerName: string, content: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        try {
+            const device = new escpos.USB();
+            const printer = new escpos.Printer(device);
+
+            device.open((err: any) => {
+                if (err) {
+                    console.error('⚠️ Printer open failed:', err.message);
+                    return resolve(); // Don't reject, just continue
+                }
+
+                printer
+                    .text(content)
+                    .cut()
+                    .close();
+
+                resolve();
+            });
+        } catch (e: any) {
+            console.error('⚠️ Printer error:', e.message);
+            resolve(); // Don't reject the promise
+        }
+    });
+}
+
+
+function sendToNetworkPrinter(ip: string, content: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const socket = new net.Socket();
+        socket.connect(9100, ip, () => {
+            socket.write(content, () => {
+                socket.end();
+                resolve();
+            });
+        });
+        socket.on('error', reject);
+    });
+}
+
+function getPrinterConfig() {
+    if (fs.existsSync(CONFIG_FILE)) {
+        return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    }
+    return null;
+}
+const config = getPrinterConfig();
+
+
 
 export async function printOrder(order: any, bill?: any): Promise<string> {
     const settings = await Settings.findOne();
@@ -58,6 +114,14 @@ export async function printOrder(order: any, bill?: any): Promise<string> {
     printContent += centerAlign("Thank You!", lineWidth) + "\n";
     printContent += divider + "\n";
 
+    if (bill) {
+        // Billing printer
+        if (config?.billing) {
+            sendToUSBPrinter(config.billing, printContent); // USB Printer
+        } else {
+            console.log("No billing printer configured.");
+        }
+    }
     console.log(printContent)
     return printContent;
 }
