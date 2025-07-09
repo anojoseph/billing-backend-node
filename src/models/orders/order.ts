@@ -3,7 +3,7 @@ import mongoose, { Schema, model, Document, Types } from 'mongoose';
 interface IOrder extends Document {
     tableId?: Types.ObjectId;
     orderType: 'Dine-in' | 'Takeaway' | 'Bill';
-    orderNumber:string;
+    orderNumber: string;
     items: Array<{
         id: Types.ObjectId;
         quantity: number;
@@ -18,6 +18,7 @@ interface IOrder extends Document {
     created_by: Types.ObjectId | null;
     updated_by: Types.ObjectId | null;
     deleted_by: Types.ObjectId | null;
+    paymentType: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other'
 }
 
 const OrderSchema = new Schema({
@@ -42,8 +43,15 @@ const OrderSchema = new Schema({
     deleted_at: { type: Date, default: null },
     created_by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     updated_by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    deleted_by: { type: Schema.Types.ObjectId, ref: 'User', default: null }
+    deleted_by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    paymentType: {
+        type: String, enum: ['Cash', 'UPI', 'Card', 'Swiggy', 'Zomato', 'Other'],
+        required: function (this: { orderType: string }) {
+            return this.orderType !== 'Dine-in';
+        }
+    }
 }, { timestamps: false });
+
 
 
 

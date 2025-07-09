@@ -16,7 +16,7 @@ interface OrderItem {
 
 
 export const createOrder = async (req: Request, res: Response): Promise<void> => {
-    const { tableId, orderType, items }: { tableId?: string; orderType: 'Dine-in' | 'Takeaway' | 'Bill'; items: OrderItem[] } = req.body;
+    const { tableId, orderType, items, paymentType }: { tableId?: string; orderType: 'Dine-in' | 'Takeaway' | 'Bill'; items: OrderItem[], paymentType: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other'; } = req.body;
 
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -60,6 +60,13 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
             });
         }
 
+        // ✅ Validate paymentType only if completed order
+        if ((orderType === 'Takeaway' || orderType === 'Bill') && !paymentType) {
+            res.status(400).json({ message: 'Payment type is required for completed orders' });
+            await session.abortTransaction();
+            return;
+        }
+
         if (orderType === 'Dine-in' && tableId) {
             const existingOrder = await Order.findOne({ tableId, status: 'pending' }).session(session);
 
@@ -98,6 +105,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
             totalAmount,
             status: orderType === 'Takeaway' || orderType === 'Bill' ? 'completed' : 'pending',
             orderNumber: nextOrderNumber,
+            paymentType: orderType === 'Dine-in' ? undefined : paymentType,
         });
 
         await newOrder.save({ session });
@@ -114,6 +122,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                 totalAmount: newOrder.totalAmount,
                 type: orderType,
                 orderNumber: nextOrderNumber,
+                paymentType
                 // Add other fields as necessary
             });
 
@@ -194,15 +203,92 @@ export const updateOrder = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
+export const completeOrder = async (req: Request, res: Response): Promise<void> => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { orderId } = req.params;
+        const { paymentType } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(orderId)) {
+            res.status(400).json({ message: 'Invalid order ID format' });
+            return;
+        }
+
+        const order = await Order.findById(orderId).session(session);
+
+        if (!order) {
+            res.status(404).json({ message: 'Order not found' });
+            return;
+        }
+
+        // ✅ Set orderNumber if not already
+        if (!order.orderNumber) {
+            const lastOrder = await Order.findOne().sort({ created_at: -1 });
+            const nextOrderNumber = lastOrder?.orderNumber
+                ? `ORD-${String(parseInt(lastOrder.orderNumber.split('-')[1]) + 1).padStart(4, '0')}`
+                : 'ORD-0001';
+            order.orderNumber = nextOrderNumber;
+        }
+
+        // ✅ Set payment type
+        if (paymentType) {
+            order.paymentType = paymentType;
+        }
+
+        // ✅ Mark as completed
+        order.status = 'completed';
+        await order.save({ session });
+
+        // ✅ Create a bill
+        const newBill = new Bill({
+            orderId: order._id,
+            tableId: order.tableId,
+            items: order.items,
+            totalAmount: order.totalAmount,
+            type: order.orderType,
+            orderNumber: order.orderNumber,
+            paymentType: order.paymentType // optional
+        });
+
+        await newBill.save({ session });
+
+        const printContent = await printOrder(order as any, newBill);
+
+        await session.commitTransaction();
+
+        res.status(200).json({
+            message: 'Order marked as completed and bill created',
+            bill: newBill,
+            printContent
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        console.error('Error completing order:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    } finally {
+        session.endSession();
+    }
+};
+
+
+
 // export const completeOrder = async (req: Request, res: Response): Promise<void> => {
 //     const session = await mongoose.startSession();
 //     session.startTransaction();
 
 //     try {
 //         const { orderId } = req.params;
+//         const { paymentType }: { paymentType: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other' } = req.body;
 
 //         if (!mongoose.Types.ObjectId.isValid(orderId)) {
 //             res.status(400).json({ message: 'Invalid order ID format' });
+//             return;
+//         }
+//         if (!paymentType) {
+//             res.status(400).json({ message: 'Payment type is required to complete the order' });
 //             return;
 //         }
 
@@ -213,25 +299,43 @@ export const updateOrder = async (req: Request, res: Response): Promise<void> =>
 //             return;
 //         }
 
-//         // Update order status to 'completed'
+//         // ✅ Ensure orderNumber exists
+//         if (!order.orderNumber) {
+//             const lastOrder = await Order.findOne().sort({ created_at: -1 });
+//             const nextOrderNumber = lastOrder?.orderNumber
+//                 ? `ORD-${String(parseInt(lastOrder.orderNumber.split('-')[1]) + 1).padStart(4, '0')}`
+//                 : 'ORD-0001';
+//             order.orderNumber = nextOrderNumber;
+//         }
+
+//         // ✅ Update status
 //         order.status = 'completed';
+//         order.paymentType = paymentType;
 //         await order.save({ session });
 
-//         // Create a new bill based on the completed order
+//         // ✅ Create Bill
 //         const newBill = new Bill({
 //             orderId: order._id,
 //             tableId: order.tableId,
 //             items: order.items,
 //             totalAmount: order.totalAmount,
 //             type: order.orderType,
-//             // Add other fields as necessary
+//             orderNumber: order.orderNumber,
+//             paymentType 
 //         });
 
 //         await newBill.save({ session });
 
+//         // ✅ Print Invoice
+//         const printContent = await printOrder(order as any, newBill); // Ensure `printOrder` handles formatting
+
 //         await session.commitTransaction();
-//         // await printOrder(order as any);
-//         res.status(200).json({ message: 'Order marked as completed and bill created', bill: newBill });
+
+//         res.status(200).json({
+//             message: 'Order marked as completed and bill created',
+//             bill: newBill,
+//             printContent, // ✅ return this to frontend
+//         });
 //     } catch (error: any) {
 //         await session.abortTransaction();
 //         console.error('Error completing order:', error);
@@ -246,73 +350,86 @@ export const updateOrder = async (req: Request, res: Response): Promise<void> =>
 //     }
 // };
 
-export const completeOrder = async (req: Request, res: Response): Promise<void> => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+// export const updateBillAndOrder = async (req: Request, res: Response) => {
+//     const session = await mongoose.startSession();
+//     session.startTransaction();
 
-    try {
-        const { orderId } = req.params;
+//     const settings = await Settings.findOne();
+//     const stockUpdateNeeded = settings?.stockUpdate ?? false;
 
-        if (!mongoose.Types.ObjectId.isValid(orderId)) {
-            res.status(400).json({ message: 'Invalid order ID format' });
-            return;
-        }
+//     try {
+//         const { billNumber } = req.body;
+//         const { items } = req.body; // Updated items (existing & new)
+//         const bill = await Bill.findOne({ billNumber }).session(session);
+//         if (!bill) {
+//             await session.abortTransaction();
+//             return res.status(404).json({ message: "Bill not found" });
+//         }
+//         const orders = await Order.findById(bill.orderId);
+//         const order = await Order.findById(bill.orderId).session(session);
+//         if (!order) {
+//             await session.abortTransaction();
+//             return res.status(404).json({ message: "Order not found" });
+//         }
 
-        const order = await Order.findById(orderId).session(session);
+//         let totalAmount = 0;
+//         const updatedItems = [];
 
-        if (!order) {
-            res.status(404).json({ message: 'Order not found' });
-            return;
-        }
+//         for (const item of items) {
+//             const { id, quantity, price } = item;
 
-        // ✅ Ensure orderNumber exists
-        if (!order.orderNumber) {
-            const lastOrder = await Order.findOne().sort({ created_at: -1 });
-            const nextOrderNumber = lastOrder?.orderNumber
-                ? `ORD-${String(parseInt(lastOrder.orderNumber.split('-')[1]) + 1).padStart(4, '0')}`
-                : 'ORD-0001';
-            order.orderNumber = nextOrderNumber;
-        }
+//             // Find the product
+//             const product = await Product.findById(id).session(session);
+//             if (!product) {
+//                 await session.abortTransaction();
+//                 return res.status(404).json({ message: `Product with id ${id} not found` });
+//             }
 
-        // ✅ Update status
-        order.status = 'completed';
-        await order.save({ session });
+//             // Check stock
+//             if (stockUpdateNeeded) {
+//                 if (quantity > product.qty) {
+//                     await session.abortTransaction();
+//                     return res.status(400).json({ message: `Not enough stock for ${product.name}` });
+//                 }
+//                 product.qty -= quantity;
+//             }
 
-        // ✅ Create Bill
-        const newBill = new Bill({
-            orderId: order._id,
-            tableId: order.tableId,
-            items: order.items,
-            totalAmount: order.totalAmount,
-            type: order.orderType,
-            orderNumber: order.orderNumber,
-        });
+//             // Deduct stock if needed
 
-        await newBill.save({ session });
+//             await product.save({ session });
 
-        // ✅ Print Invoice
-        const printContent = await printOrder(order as any, newBill); // Ensure `printOrder` handles formatting
+//             const totalPrice = quantity * price;
+//             totalAmount += totalPrice;
 
-        await session.commitTransaction();
+//             updatedItems.push({
+//                 id: new mongoose.Types.ObjectId(id),
+//                 quantity,
+//                 price,
+//                 totalPrice
+//             });
+//         }
 
-        res.status(200).json({
-            message: 'Order marked as completed and bill created',
-            bill: newBill,
-            printContent, // ✅ return this to frontend
-        });
-    } catch (error: any) {
-        await session.abortTransaction();
-        console.error('Error completing order:', error);
+//         // Update the order
+//         (order.items as any) = updatedItems; // ✅ Fix applied
+//         order.totalAmount = totalAmount;
+//         await order.save({ session });
 
-        if (error.name === 'CastError') {
-            res.status(400).json({ message: 'Invalid order ID' });
-        } else {
-            res.status(500).json({ message: 'Internal server error' });
-        }
-    } finally {
-        session.endSession();
-    }
-};
+//         // Update the bill
+//         (bill.items as any) = updatedItems; // ✅ Fix applied
+//         bill.totalAmount = totalAmount;
+//         await bill.save({ session });
+
+//         await session.commitTransaction();
+//         res.status(200).json({ message: "Bill and Order updated successfully", bill });
+
+//     } catch (error) {
+//         await session.abortTransaction();
+//         console.error("Error updating bill/order:", error);
+//         res.status(500).json({ message: "Internal server error" });
+//     } finally {
+//         session.endSession();
+//     }
+// };
 
 export const updateBillAndOrder = async (req: Request, res: Response) => {
     const session = await mongoose.startSession();
@@ -322,14 +439,18 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
     const stockUpdateNeeded = settings?.stockUpdate ?? false;
 
     try {
-        const { billNumber } = req.body;
-        const { items } = req.body; // Updated items (existing & new)
+        const { billNumber, items, paymentType }: {
+            billNumber: string;
+            items: Array<{ id: string; quantity: number; price: number }>;
+            paymentType?: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other';
+        } = req.body;
+
         const bill = await Bill.findOne({ billNumber }).session(session);
         if (!bill) {
             await session.abortTransaction();
             return res.status(404).json({ message: "Bill not found" });
         }
-        const orders = await Order.findById(bill.orderId);
+
         const order = await Order.findById(bill.orderId).session(session);
         if (!order) {
             await session.abortTransaction();
@@ -342,14 +463,12 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
         for (const item of items) {
             const { id, quantity, price } = item;
 
-            // Find the product
             const product = await Product.findById(id).session(session);
             if (!product) {
                 await session.abortTransaction();
                 return res.status(404).json({ message: `Product with id ${id} not found` });
             }
 
-            // Check stock
             if (stockUpdateNeeded) {
                 if (quantity > product.qty) {
                     await session.abortTransaction();
@@ -357,8 +476,6 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
                 }
                 product.qty -= quantity;
             }
-
-            // Deduct stock if needed
 
             await product.save({ session });
 
@@ -373,14 +490,24 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
             });
         }
 
-        // Update the order
-        (order.items as any) = updatedItems; // ✅ Fix applied
+        // ✅ Update Order
+        order.items = updatedItems as any;
         order.totalAmount = totalAmount;
+
+        if (paymentType) {
+            order.paymentType = paymentType;
+        }
+
         await order.save({ session });
 
-        // Update the bill
-        (bill.items as any) = updatedItems; // ✅ Fix applied
+        // ✅ Update Bill
+        bill.items = updatedItems as any;
         bill.totalAmount = totalAmount;
+
+        if (paymentType) {
+            bill.paymentType = paymentType;
+        }
+
         await bill.save({ session });
 
         await session.commitTransaction();

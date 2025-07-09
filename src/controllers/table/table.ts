@@ -36,7 +36,7 @@ export const createTable = async (req: Request, res: Response): Promise<void> =>
         const newTable = new TableModel({ name, status, no, qr_code });
         const savedTable = await newTable.save();
         
-          const qrData = `${process.env.FRONTEND_URL}/order/table/${savedTable._id}`;
+        const qrData = `${process.env.FRONTEND_URL}/order/table/${savedTable._id}`;
         const qrImage = await QRCode.toDataURL(qrData);
 
         savedTable.qr_code = qrImage;

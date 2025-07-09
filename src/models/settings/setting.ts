@@ -5,9 +5,11 @@ export interface ISettings extends Document {
     logo: string;
     status: boolean;
     stockUpdate: boolean;
-    printerPort:string;
-    accept_qr_booking:boolean;
-    show_available_qty:boolean;
+    printerPort: string;
+    accept_qr_booking: boolean;
+    show_available_qty: boolean;
+    auto_print_bill: boolean;
+    auto_print_kot: boolean;
 }
 
 const SettingsSchema: Schema = new Schema({
@@ -17,7 +19,10 @@ const SettingsSchema: Schema = new Schema({
     stockUpdate: { type: Boolean, default: false },
     printerPort: { type: String, required: false },
     accept_qr_booking: { type: Boolean, required: false },
-    show_available_qty: { type: Boolean, required: false }
+    show_available_qty: { type: Boolean, required: false },
+    auto_print_bill: { type: Boolean, required: false },
+    auto_print_kot: { type: Boolean, required: false }
+
 
 });
 

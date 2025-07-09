@@ -54,6 +54,9 @@ export const updateSettings = [
             settings.stockUpdate = req.body.stockUpdate === 'true';
             settings.accept_qr_booking = req.body.accept_qr_booking === 'true';
             settings.show_available_qty = req.body.show_available_qty === 'true';
+            settings.auto_print_bill = req.body.auto_print_bill === 'true';
+            settings.auto_print_kot = req.body.auto_print_kot === 'true';
+
 
 
             // Handle file upload

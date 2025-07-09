@@ -5,7 +5,8 @@ import {
   createMenu,
   updateMenu,
   getMenuById,
-  getAllMenus
+  getAllMenus,
+  deleteMenu
 } from '../../controllers/menu/menu.controller';
 import { seedMenus } from '../../controllers/menu/menu.seed';
 
@@ -17,5 +18,6 @@ router.get('/menu/:id', getMenuById as RequestHandler); // 👈 added
 router.post('/menu', createMenu as RequestHandler);
 router.put('/menu/:id', updateMenu as RequestHandler);
 router.post('/menu/seed', seedMenus as RequestHandler);
+router.delete('/menu/:id', deleteMenu  as RequestHandler);
 
 export default router;

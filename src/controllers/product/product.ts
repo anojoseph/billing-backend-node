@@ -2,11 +2,12 @@ import { Request, Response } from "express";
 import ProductModel from "../../models/product/product";
 import ProductItemModel from "../../models/product/produtcItem";
 import MealTypeModel from "../../models/product/mealType";
+import Kitchen from "../../models/kitchen/Kitchen";
 
 // Create a new product with an image
 export const createProduct = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { name, price, ingredients, type, mealType, qty, selectedQty } = req.body;
+        const { name, price, ingredients, type, mealType, qty, selectedQty, kitchen } = req.body;
         const image = req.file?.path;  // Image is now optional
         const imageUrl = image ? `${req.protocol}://${req.get("host")}/${image.replace(/\\/g, "/")}` : null;  // Use null if no image is provided
         const ingredientsArray = ingredients ? ingredients.split(",").map((item: string) => item.trim()) : [];
@@ -29,6 +30,8 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
+        //const kitchens = await MealTypeModel.findById(kitchen);
+
         const product = new ProductModel({
             name,
             price,
@@ -39,9 +42,14 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
             qty,
             selectedQty,
             status: true,
+            kitchen: kitchen
         });
 
         await product.save();
+        await Kitchen.findByIdAndUpdate(
+            kitchen,
+            { $addToSet: { items: product._id } }
+        );
         res.status(201).json({ message: "Product created successfully", product });
     } catch (error: any) {
         res.status(500).json({ message: "Error creating product", error: error.message });
@@ -52,7 +60,7 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
 // Update a product
 export const updateProduct = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { id, name, price, ingredients, type, mealType, qty, selectedQty } = req.body;
+        const { id, name, price, ingredients, type, mealType, qty, selectedQty, kitchen } = req.body;
         const image = req.file?.path;  // Image is now optional
 
         const product = await ProductModel.findById(id);
@@ -76,6 +84,21 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
         if (selectedQty) product.selectedQty = selectedQty;
         if (image) {
             product.image = `${req.protocol}://${req.get("host")}/${image.replace(/\\/g, "/")}`;
+        }
+        if (kitchen && kitchen.toString() !== product.kitchen?.toString()) {
+            // Remove from old kitchen
+            if (product.kitchen) {
+                await Kitchen.findByIdAndUpdate(product.kitchen, {
+                    $pull: { items: product._id }
+                });
+            }
+
+            // Add to new kitchen
+            await Kitchen.findByIdAndUpdate(kitchen, {
+                $addToSet: { items: product._id }
+            });
+
+            product.kitchen = kitchen;
         }
 
         await product.save();

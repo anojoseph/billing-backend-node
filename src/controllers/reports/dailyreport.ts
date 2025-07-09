@@ -10,51 +10,44 @@ export const getBillWiseSalesReport = async (req: Request, res: Response): Promi
             return;
         }
 
-        // Convert startDate and endDate to Date objects
         const startDateObj = new Date(startDate as string);
         const endDateObj = new Date(endDate as string);
-
-        // Set endDate to the next day to include all bills on the endDate
         endDateObj.setDate(endDateObj.getDate() + 1);
 
-        // Build the match stage for filtering by date and type (if provided)
         const matchStage: any = {
             createdAt: {
-                $gte: startDateObj, // Bills created on or after startDate
-                $lt: endDateObj,    // Bills created before the next day of endDate
+                $gte: startDateObj,
+                $lt: endDateObj,
             },
         };
 
-        // Add type filter if provided
         if (type) {
             matchStage.type = type;
         }
 
-        // Generate the bill-wise sales report using aggregation
         const billWiseReport = await Bill.aggregate([
             {
-                $match: matchStage, // Filter bills by date and type (if provided)
+                $match: matchStage,
             },
             {
                 $project: {
-                    _id: 1, // Include bill ID
+                    _id: 1,
                     billNumber: 1,
-                    orderId: 1, // Include order ID
-                    tableId: 1, // Include table ID
-                    totalAmount: 1, // Include total amount
-                    type: 1, // Include bill type
-                    createdAt: 1, // Include creation date
+                    orderId: 1,
+                    tableId: 1,
+                    totalAmount: 1,
+                    type: 1,
+                    createdAt: 1,
+                    paymentType: 1, // ✅ Include this
                 },
             },
             {
-                $sort: { createdAt: 1 }, // Sort bills by creation date
+                $sort: { createdAt: 1 },
             },
         ]);
 
-        // Calculate the total amount summary
         const totalAmountSummary = billWiseReport.reduce((sum, bill) => sum + bill.totalAmount, 0);
 
-        // Send the bill-wise report and total amount summary as a response
         res.status(200).json({
             bills: billWiseReport,
             summary: {
@@ -67,6 +60,7 @@ export const getBillWiseSalesReport = async (req: Request, res: Response): Promi
         res.status(500).json({ message: 'Internal server error' });
     }
 };
+
 
 export const getItemWiseSalesReport = async (req: Request, res: Response): Promise<void> => {
     try {

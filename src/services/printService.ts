@@ -26,6 +26,12 @@ export async function printOrder(order: any, bill?: any): Promise<string> {
         : `Order No: ${order.orderNumber}\n`;
     printContent += `Date    : ${dateStr}\n`;
     printContent += `Type    : ${order.orderType}\n`;
+
+    // ✅ Add payment type (only if available)
+    if (order.paymentType) {
+        printContent += `Payment : ${order.paymentType}\n`;
+    }
+
     printContent += lineDivider + "\n";
 
     printContent += "Item".padEnd(18) + " " +
@@ -52,5 +58,7 @@ export async function printOrder(order: any, bill?: any): Promise<string> {
     printContent += centerAlign("Thank You!", lineWidth) + "\n";
     printContent += divider + "\n";
 
+    console.log(printContent)
     return printContent;
 }
+

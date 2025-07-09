@@ -11,6 +11,7 @@ interface ProductModel extends Document {
     selectedQty: number;
     status: boolean;
     deleted_at?: Date | null;
+    kitchen:any;
 }
 
 const productSchema = new Schema<ProductModel>(
@@ -24,7 +25,8 @@ const productSchema = new Schema<ProductModel>(
         qty: { type: Number },
         selectedQty: { type: Number },
         status: { type: Boolean, default: true },
-        deleted_at: { type: Date, default: null }
+        deleted_at: { type: Date, default: null },
+        kitchen: { type: mongoose.Schema.Types.ObjectId, ref: 'Kitchen' }
     },
     { timestamps: true }
 );

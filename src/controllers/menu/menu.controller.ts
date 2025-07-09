@@ -73,10 +73,23 @@ export const getMenuById = async (req: Request, res: Response) => {
 
 // controllers/menu.controller.ts
 export const getAllMenus = async (req: Request, res: Response) => {
-  try {
-    const menus = await MenuItem.find();
-    res.json(menus);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch menus', error });
-  }
+    try {
+        const menus = await MenuItem.find();
+        res.json(menus);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch menus', error });
+    }
 };
+
+export const deleteMenu = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const deleted = await MenuItem.findByIdAndDelete(id);
+        if (!deleted) return res.status(404).json({ message: 'Menu not found' });
+
+        res.json({ message: 'Menu deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to delete menu', error });
+    }
+};
+
