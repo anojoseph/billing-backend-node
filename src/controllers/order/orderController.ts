@@ -4,7 +4,7 @@ import Product from '../../models/product/product';
 import Settings from '../../models/settings/setting';
 import Bill from '../../models/bill/bill';
 import mongoose from 'mongoose';
-import { printOrder } from '../../services/printService';
+import { printOrder, printToken } from '../../services/printService';
 import { printKitchenTickets } from "../kitchen/kot";
 
 interface OrderItem {
@@ -12,6 +12,13 @@ interface OrderItem {
     quantity: number;
     price: number;
     totalPrice?: number;
+    addons?: Addon[];
+}
+
+interface Addon {
+    name: string;
+    qty: number;
+    price: number;
 }
 
 
@@ -26,7 +33,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
         const stockUpdateNeeded = settings?.stockUpdate ?? false;
 
         let totalAmount = 0;
-        const processedItems: { id: mongoose.Types.ObjectId; quantity: number; price: number; totalPrice: number }[] = [];
+        const processedItems: { id: mongoose.Types.ObjectId; quantity: number; price: number; totalPrice: number; addons?: Addon[]; }[] = [];
 
         for (const item of items) {
             const { id, quantity, price } = item;
@@ -56,7 +63,8 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                 id: new mongoose.Types.ObjectId(id),
                 quantity,
                 price,
-                totalPrice
+                totalPrice,
+                ...(item.addons ? { addons: item.addons } : {})
             });
         }
 
@@ -129,6 +137,8 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
 
             await newBill.save({ session });
             printContent = await printOrder(newOrder as any, newBill);
+            await printToken(newOrder);
+            await printKitchenTickets(newOrder._id); 
             // Optionally, print the order
             // await printOrder(newOrder as any);
         }
@@ -140,6 +150,7 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                 order: newOrder,
                 ...(printContent && { printContent })
             });
+
         }
         else {
             res.status(201).json({
@@ -148,7 +159,8 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
             });
         }
 
-        await printKitchenTickets(newOrder._id); //printing order
+
+        //await printKitchenTickets(newOrder._id); //printing order
 
     } catch (error) {
         await session.abortTransaction();
@@ -274,163 +286,6 @@ export const completeOrder = async (req: Request, res: Response): Promise<void> 
 };
 
 
-
-// export const completeOrder = async (req: Request, res: Response): Promise<void> => {
-//     const session = await mongoose.startSession();
-//     session.startTransaction();
-
-//     try {
-//         const { orderId } = req.params;
-//         const { paymentType }: { paymentType: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other' } = req.body;
-
-//         if (!mongoose.Types.ObjectId.isValid(orderId)) {
-//             res.status(400).json({ message: 'Invalid order ID format' });
-//             return;
-//         }
-//         if (!paymentType) {
-//             res.status(400).json({ message: 'Payment type is required to complete the order' });
-//             return;
-//         }
-
-//         const order = await Order.findById(orderId).session(session);
-
-//         if (!order) {
-//             res.status(404).json({ message: 'Order not found' });
-//             return;
-//         }
-
-//         // ✅ Ensure orderNumber exists
-//         if (!order.orderNumber) {
-//             const lastOrder = await Order.findOne().sort({ created_at: -1 });
-//             const nextOrderNumber = lastOrder?.orderNumber
-//                 ? `ORD-${String(parseInt(lastOrder.orderNumber.split('-')[1]) + 1).padStart(4, '0')}`
-//                 : 'ORD-0001';
-//             order.orderNumber = nextOrderNumber;
-//         }
-
-//         // ✅ Update status
-//         order.status = 'completed';
-//         order.paymentType = paymentType;
-//         await order.save({ session });
-
-//         // ✅ Create Bill
-//         const newBill = new Bill({
-//             orderId: order._id,
-//             tableId: order.tableId,
-//             items: order.items,
-//             totalAmount: order.totalAmount,
-//             type: order.orderType,
-//             orderNumber: order.orderNumber,
-//             paymentType 
-//         });
-
-//         await newBill.save({ session });
-
-//         // ✅ Print Invoice
-//         const printContent = await printOrder(order as any, newBill); // Ensure `printOrder` handles formatting
-
-//         await session.commitTransaction();
-
-//         res.status(200).json({
-//             message: 'Order marked as completed and bill created',
-//             bill: newBill,
-//             printContent, // ✅ return this to frontend
-//         });
-//     } catch (error: any) {
-//         await session.abortTransaction();
-//         console.error('Error completing order:', error);
-
-//         if (error.name === 'CastError') {
-//             res.status(400).json({ message: 'Invalid order ID' });
-//         } else {
-//             res.status(500).json({ message: 'Internal server error' });
-//         }
-//     } finally {
-//         session.endSession();
-//     }
-// };
-
-// export const updateBillAndOrder = async (req: Request, res: Response) => {
-//     const session = await mongoose.startSession();
-//     session.startTransaction();
-
-//     const settings = await Settings.findOne();
-//     const stockUpdateNeeded = settings?.stockUpdate ?? false;
-
-//     try {
-//         const { billNumber } = req.body;
-//         const { items } = req.body; // Updated items (existing & new)
-//         const bill = await Bill.findOne({ billNumber }).session(session);
-//         if (!bill) {
-//             await session.abortTransaction();
-//             return res.status(404).json({ message: "Bill not found" });
-//         }
-//         const orders = await Order.findById(bill.orderId);
-//         const order = await Order.findById(bill.orderId).session(session);
-//         if (!order) {
-//             await session.abortTransaction();
-//             return res.status(404).json({ message: "Order not found" });
-//         }
-
-//         let totalAmount = 0;
-//         const updatedItems = [];
-
-//         for (const item of items) {
-//             const { id, quantity, price } = item;
-
-//             // Find the product
-//             const product = await Product.findById(id).session(session);
-//             if (!product) {
-//                 await session.abortTransaction();
-//                 return res.status(404).json({ message: `Product with id ${id} not found` });
-//             }
-
-//             // Check stock
-//             if (stockUpdateNeeded) {
-//                 if (quantity > product.qty) {
-//                     await session.abortTransaction();
-//                     return res.status(400).json({ message: `Not enough stock for ${product.name}` });
-//                 }
-//                 product.qty -= quantity;
-//             }
-
-//             // Deduct stock if needed
-
-//             await product.save({ session });
-
-//             const totalPrice = quantity * price;
-//             totalAmount += totalPrice;
-
-//             updatedItems.push({
-//                 id: new mongoose.Types.ObjectId(id),
-//                 quantity,
-//                 price,
-//                 totalPrice
-//             });
-//         }
-
-//         // Update the order
-//         (order.items as any) = updatedItems; // ✅ Fix applied
-//         order.totalAmount = totalAmount;
-//         await order.save({ session });
-
-//         // Update the bill
-//         (bill.items as any) = updatedItems; // ✅ Fix applied
-//         bill.totalAmount = totalAmount;
-//         await bill.save({ session });
-
-//         await session.commitTransaction();
-//         res.status(200).json({ message: "Bill and Order updated successfully", bill });
-
-//     } catch (error) {
-//         await session.abortTransaction();
-//         console.error("Error updating bill/order:", error);
-//         res.status(500).json({ message: "Internal server error" });
-//     } finally {
-//         session.endSession();
-//     }
-// };
-
 export const updateBillAndOrder = async (req: Request, res: Response) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -441,7 +296,7 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
     try {
         const { billNumber, items, paymentType }: {
             billNumber: string;
-            items: Array<{ id: string; quantity: number; price: number }>;
+            items: Array<{ id: string; quantity: number; price: number; addons?: Array<{ name: string; qty: number; price: number }> }>;
             paymentType?: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other';
         } = req.body;
 
@@ -486,7 +341,8 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
                 id: new mongoose.Types.ObjectId(id),
                 quantity,
                 price,
-                totalPrice
+                totalPrice,
+                addons: item.addons ?? []
             });
         }
 

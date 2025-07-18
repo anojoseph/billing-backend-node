@@ -11,7 +11,11 @@ interface ProductModel extends Document {
     selectedQty: number;
     status: boolean;
     deleted_at?: Date | null;
-    kitchen:any;
+    kitchen: any;
+    addons?: {
+        name: string;
+        price: number;
+    }[];
 }
 
 const productSchema = new Schema<ProductModel>(
@@ -26,7 +30,16 @@ const productSchema = new Schema<ProductModel>(
         selectedQty: { type: Number },
         status: { type: Boolean, default: true },
         deleted_at: { type: Date, default: null },
-        kitchen: { type: mongoose.Schema.Types.ObjectId, ref: 'Kitchen' }
+        kitchen: { type: mongoose.Schema.Types.ObjectId, ref: 'Kitchen' },
+        addons: {
+            type: [
+                {
+                    name: { type: String, required: true },
+                    price: { type: Number, required: true }
+                }
+            ],
+            default: undefined  // Optional field
+        }
     },
     { timestamps: true }
 );

@@ -9,6 +9,11 @@ interface IOrder extends Document {
         quantity: number;
         price: number;
         totalPrice: number;
+        addons?: Array<{
+            name: string;
+            qty: number;
+            price: number;
+        }>;
     }>;
     totalAmount: number;
     status: 'pending' | 'completed';
@@ -34,7 +39,14 @@ const OrderSchema = new Schema({
         id: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
         quantity: { type: Number, required: true },
         price: { type: Number, required: true },
-        totalPrice: { type: Number, required: true }
+        totalPrice: { type: Number, required: true },
+        addons: [
+            {
+                name: { type: String },
+                qty: { type: Number },
+                price: { type: Number }
+            }
+        ]
     }],
     totalAmount: { type: Number, required: true },
     status: { type: String, enum: ['pending', 'completed'], default: 'pending' },

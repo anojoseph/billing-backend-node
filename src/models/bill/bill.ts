@@ -10,7 +10,15 @@ const billSchema = new mongoose.Schema({
             quantity: { type: Number, required: true },
             price: { type: Number, required: true },
             totalPrice: { type: Number, required: true },
+            addons: [
+                {
+                    name: { type: String },
+                    qty: { type: Number },
+                    price: { type: Number }
+                }
+            ]
         },
+
     ],
     totalAmount: { type: Number, required: true },
     type: {
@@ -21,7 +29,7 @@ const billSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     deleted_at: { type: Date, default: null }, // Soft delete field
     deleted_by: { type: String, ref: 'User', default: null },
-    paymentType:{type: String, required: false}
+    paymentType: { type: String, required: false }
 });
 
 // Middleware to auto-generate bill number starting from 1001

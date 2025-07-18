@@ -7,7 +7,7 @@ import Kitchen from "../../models/kitchen/Kitchen";
 // Create a new product with an image
 export const createProduct = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { name, price, ingredients, type, mealType, qty, selectedQty, kitchen } = req.body;
+        const { name, price, ingredients, type, mealType, qty, selectedQty, kitchen, addons } = req.body;
         const image = req.file?.path;  // Image is now optional
         const imageUrl = image ? `${req.protocol}://${req.get("host")}/${image.replace(/\\/g, "/")}` : null;  // Use null if no image is provided
         const ingredientsArray = ingredients ? ingredients.split(",").map((item: string) => item.trim()) : [];
@@ -30,6 +30,14 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
+
+        const parsedAddons = Array.isArray(addons)
+            ? addons
+            : typeof addons === 'string'
+                ? JSON.parse(addons)
+                : [];
+
+
         //const kitchens = await MealTypeModel.findById(kitchen);
 
         const product = new ProductModel({
@@ -42,7 +50,8 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
             qty,
             selectedQty,
             status: true,
-            kitchen: kitchen
+            kitchen: kitchen,
+            addons: parsedAddons
         });
 
         await product.save();
@@ -60,7 +69,7 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
 // Update a product
 export const updateProduct = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { id, name, price, ingredients, type, mealType, qty, selectedQty, kitchen } = req.body;
+        const { id, name, price, ingredients, type, mealType, qty, selectedQty, kitchen, addons } = req.body;
         const image = req.file?.path;  // Image is now optional
 
         const product = await ProductModel.findById(id);
@@ -85,6 +94,9 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
         if (image) {
             product.image = `${req.protocol}://${req.get("host")}/${image.replace(/\\/g, "/")}`;
         }
+        if (addons) {
+            product.addons = typeof req.body.addons === 'string' ? JSON.parse(req.body.addons) : req.body.addons;
+        }
         if (kitchen && kitchen.toString() !== product.kitchen?.toString()) {
             // Remove from old kitchen
             if (product.kitchen) {
@@ -92,6 +104,8 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
                     $pull: { items: product._id }
                 });
             }
+
+
 
             // Add to new kitchen
             await Kitchen.findByIdAndUpdate(kitchen, {
