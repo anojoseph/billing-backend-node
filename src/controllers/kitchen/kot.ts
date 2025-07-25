@@ -14,7 +14,7 @@ function getPrinterConfig() {
   return { kitchens: {} };
 }
 
-function sendToNetworkPrinter(ipPort: string, content: string): Promise<void> {
+function sendToNetworkPrinter(ipPort: string, content: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
     const [host, portStr] = ipPort.split(':');
     const port = parseInt(portStr, 10) || 9100;
@@ -30,10 +30,35 @@ function sendToNetworkPrinter(ipPort: string, content: string): Promise<void> {
   });
 }
 
+
 function formatDateTime() {
   const now = new Date();
   return now.toLocaleString('en-GB', { hour12: true });
 }
+
+function getESC_POSCommands(text: string): Buffer {
+  const ESC = '\x1B';
+  const GS = '\x1D';
+  const cut = GS + 'V' + '\x00'; // Full cut
+  const initialize = ESC + '@'; // Initialize printer
+  const alignCenter = ESC + 'a' + '\x01';
+  const alignLeft = ESC + 'a' + '\x00';
+  const boldOn = ESC + 'E' + '\x01';
+  const boldOff = ESC + 'E' + '\x00';
+  const lineSpacing = ESC + '3' + '\x18'; // 24-dot spacing
+
+  const finalText = [
+    initialize,
+    lineSpacing,
+    alignCenter + boldOn + "KOT Ticket\n" + boldOff,
+    alignLeft,
+    text,
+    cut
+  ].join('');
+
+  return Buffer.from(finalText, 'ascii');
+}
+
 
 async function printKitchenTickets(orderId: any) {
   const order = await Order.findById(orderId);
@@ -115,7 +140,7 @@ async function printKitchenTickets(orderId: any) {
     const kitchenPrinterIp = printerConfig.kitchens?.[kitchenId];
     if (kitchenPrinterIp) {
       try {
-        await sendToNetworkPrinter(kitchenPrinterIp, ticket);
+        await sendToNetworkPrinter(kitchenPrinterIp, getESC_POSCommands(ticket));
         console.log(`✅ Printed KOT for ${data.kitchenName} to ${kitchenPrinterIp}`);
       } catch (err) {
         console.error(`❌ Failed to print to ${kitchenPrinterIp}`, err);

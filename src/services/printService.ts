@@ -34,7 +34,7 @@ function sendToUSBPrinter(printerName: string, content: string): Promise<void> {
 }
 
 
-function sendToNetworkPrinter(ipPort: string, content: string): Promise<void> {
+function sendToNetworkPrinter(ipPort: string, content: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
         const [host, portStr] = ipPort.split(':');
         const port = parseInt(portStr, 10) || 9100;
@@ -141,7 +141,8 @@ export async function printOrder(order: any, bill?: any): Promise<string> {
     if (bill) {
         // Billing printer
         if (config?.billing) {
-            sendToNetworkPrinter(config.billing, printContent); // USB Printer
+            sendToNetworkPrinter(config.billing, wrapWithEscPos(printContent));
+            // USB Printer
         } else {
             console.log("No billing printer configured.");
         }
@@ -184,7 +185,9 @@ export async function printToken(order: any) {
 
     // Print to token printer (USB or Network)
     if (config?.token) {
-        await sendToNetworkPrinter(config.token, content); // USB printer
+        await sendToNetworkPrinter(config.token, wrapWithEscPos(content));
+        await testWiFiPrint()
+        // USB printer
     } else {
         console.warn("⚠️ No token printer configured.");
     }
@@ -195,4 +198,32 @@ export async function printToken(order: any) {
 
 function formatTimeToken() {
     return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function wrapWithEscPos(text: string): Buffer {
+    const ESC = '\x1B';
+    const GS = '\x1D';
+    const init = ESC + '@';
+    const cut = GS + 'V' + '\x00';
+    const lineSpacing = ESC + '3' + '\x18';
+    const finalText = [
+        init,
+        lineSpacing,
+        text,
+        '\n\n\n\n',  // Space before cut
+        cut
+    ].join('');
+    return Buffer.from(finalText, 'ascii');
+}
+
+export async function testWiFiPrint() {
+  const testText = "✅ Wi-Fi Printer Connected\nTest print from Node.js\n\n";
+  const buffer = wrapWithEscPos(testText);
+
+  try {
+    await sendToNetworkPrinter("192.168.1.111:9100", buffer);
+    console.log("✅ Test print sent via Wi-Fi");
+  } catch (err) {
+    console.error("❌ Test print failed:");
+  }
 }
