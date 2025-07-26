@@ -157,7 +157,12 @@ export async function printOrder(order: any, bill?: any): Promise<string> {
 
     if (bill) {
         if (config?.billing) {
-            await sendToNetworkPrinter(config.billing, wrapWithEscPos(printContent));
+            //await sendToNetworkPrinter(config.billing, wrapWithEscPos(printContent));
+            await PrintJob.create({
+                content: printContent,
+                type: 'bill',
+                status: 'pending'
+            });
         } else {
             console.warn("⚠️ No billing printer configured.");
             await PrintJob.create({

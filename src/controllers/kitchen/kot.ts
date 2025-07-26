@@ -141,14 +141,19 @@ async function printKitchenTickets(orderId: any) {
     const kitchenPrinterIp = printerConfig.kitchens?.[kitchenId];
     if (kitchenPrinterIp) {
       try {
-        await sendToNetworkPrinter(kitchenPrinterIp, getESC_POSCommands(ticket));
-        console.log(`✅ Printed KOT for ${data.kitchenName} to ${kitchenPrinterIp}`);
-      } catch (err) {
+        //await sendToNetworkPrinter(kitchenPrinterIp, getESC_POSCommands(ticket));
         await PrintJob.create({
                     content: ticket,
                     type: 'token',
                     status: 'pending'
                 });
+        console.log(`✅ Printed KOT for ${data.kitchenName} to ${kitchenPrinterIp}`);
+      } catch (err) {
+        // await PrintJob.create({
+        //             content: ticket,
+        //             type: 'token',
+        //             status: 'pending'
+        //         });
         console.error(`❌ Failed to print to ${kitchenPrinterIp}`, err);
       }
     } else {
