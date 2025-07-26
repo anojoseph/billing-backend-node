@@ -4,8 +4,13 @@ import fs from 'fs';
 const CONFIG_FILE = './printer-config.json';
 import net from 'net';
 import escpos from 'escpos';
+import PrintJob from '../models/settings/printJob';
+import bill from "../models/bill/bill";
 
 escpos.USB = require('escpos-usb'); // required for USB printing
+
+
+
 
 function sendToUSBPrinter(printerName: string, content: string): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -186,13 +191,20 @@ export async function printToken(order: any) {
     // Print to token printer (USB or Network)
     if (config?.token) {
         await sendToNetworkPrinter(config.token, wrapWithEscPos(content));
-        await testWiFiPrint()
+        
         // USB printer
     } else {
         console.warn("⚠️ No token printer configured.");
     }
 
     console.log("🧾 Token Printed:\n", content);
+
+    await PrintJob.create({
+    content: content,
+    type: bill ? 'bill' : 'token', // optional, useful if you want to separate token/bill
+    status: 'pending'
+    });
+
     return content;
 }
 
@@ -214,16 +226,4 @@ function wrapWithEscPos(text: string): Buffer {
         cut
     ].join('');
     return Buffer.from(finalText, 'ascii');
-}
-
-export async function testWiFiPrint() {
-  const testText = "✅ Wi-Fi Printer Connected\nTest print from Node.js\n\n";
-  const buffer = wrapWithEscPos(testText);
-
-  try {
-    await sendToNetworkPrinter("192.168.1.111:9100", buffer);
-    console.log("✅ Test print sent via Wi-Fi");
-  } catch (err) {
-    console.error("❌ Test print failed:");
-  }
 }

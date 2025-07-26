@@ -9,6 +9,7 @@ import reportRoutes from './routes/reports/report.routes';
 import kitchenRoutes from "./routes/kitchen/kitchenRoutes";
 import menuRoutes from './routes/menu/menu.routes';
 //import port from "./routes/port/port"
+import PrintJob from './models/settings/printJob';
 
 
 import mongoose from "mongoose";
@@ -60,4 +61,16 @@ app.use('/menu', menuRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+app.get('/api/print-jobs', async (req, res) => {
+  try {
+    const jobs = await PrintJob.find({ status: 'pending' }).limit(10);
+    res.json(jobs.map(job => ({
+      id: job._id,
+      content: job.content
+    })));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch print jobs' });
+  }
 });
