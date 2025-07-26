@@ -143,10 +143,10 @@ async function printKitchenTickets(orderId: any) {
       try {
         //await sendToNetworkPrinter(kitchenPrinterIp, getESC_POSCommands(ticket));
         await PrintJob.create({
-                    content: ticket,
-                    type: 'token',
-                    status: 'pending'
-                });
+          content:  getESC_POSCommands(ticket),
+          type: 'token',
+          status: 'pending'
+        });
         console.log(`✅ Printed KOT for ${data.kitchenName} to ${kitchenPrinterIp}`);
       } catch (err) {
         // await PrintJob.create({

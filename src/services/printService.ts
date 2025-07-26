@@ -159,17 +159,12 @@ export async function printOrder(order: any, bill?: any): Promise<string> {
         if (config?.billing) {
             //await sendToNetworkPrinter(config.billing, wrapWithEscPos(printContent));
             await PrintJob.create({
-                content: printContent,
+                content: wrapWithEscPos(printContent),
                 type: 'bill',
                 status: 'pending'
             });
         } else {
             console.warn("⚠️ No billing printer configured.");
-            await PrintJob.create({
-                content: printContent,
-                type: 'bill',
-                status: 'pending'
-            });
         }
     }
 
@@ -210,15 +205,16 @@ export async function printToken(order: any) {
 
     // Print to token printer (USB or Network)
     if (config?.token) {
-        await sendToNetworkPrinter(config.token, wrapWithEscPos(content));
-    } else {
-        console.warn("⚠️ No token printer configured.");
-
-        await PrintJob.create({
-            content: content,
+        //await sendToNetworkPrinter(config.token, wrapWithEscPos(content));
+         await PrintJob.create({
+            content: wrapWithEscPos(content),
             type: 'token',
             status: 'pending'
         });
+    } else {
+        console.warn("⚠️ No token printer configured.");
+
+       
     }
 
 
