@@ -74,3 +74,11 @@ app.get('/api/print-jobs', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch print jobs' });
   }
 });
+app.post('/api/print-jobs/:id/complete', async (req, res) => {
+  try {
+    await PrintJob.findByIdAndUpdate(req.params.id, { status: 'printed' });
+    res.json({ message: 'Print job marked as printed' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update print job' });
+  }
+});
