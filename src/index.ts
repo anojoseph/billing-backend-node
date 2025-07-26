@@ -48,21 +48,6 @@ app.use("/api/auth", authRoutes);
 const uploadsDir = path.join(__dirname, '../uploads');
 app.use('/uploads', express.static(uploadsDir));
 
-app.use(authMiddleware);
-app.use('/data-table', datatableRoutes);
-app.use("/product", productRoute);
-app.use("/table", tableRoute);
-app.use('/order', orderRoute);
-app.use('/settings', settingsRoutes);
-app.use('/reports', reportRoutes);
-app.use("/kitchens", kitchenRoutes);
-app.use('/menu', menuRoutes);
-//app.use("/ports", port);
-
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
-
 app.get('/api/print-jobs', async (req, res) => {
   try {
     const jobs = await PrintJob.find({ status: 'pending' }).limit(10);
@@ -82,3 +67,20 @@ app.post('/api/print-jobs/:id/complete', async (req, res) => {
     res.status(500).json({ error: 'Failed to update print job' });
   }
 });
+
+
+app.use(authMiddleware);
+app.use('/data-table', datatableRoutes);
+app.use("/product", productRoute);
+app.use("/table", tableRoute);
+app.use('/order', orderRoute);
+app.use('/settings', settingsRoutes);
+app.use('/reports', reportRoutes);
+app.use("/kitchens", kitchenRoutes);
+app.use('/menu', menuRoutes);
+//app.use("/ports", port);
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+

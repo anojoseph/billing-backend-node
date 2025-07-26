@@ -6,6 +6,7 @@ import Kitchen from "../../models/kitchen/Kitchen";
 import Table from "../../models/table/table";
 
 const CONFIG_FILE = './printer-config.json';
+import PrintJob from '../../models/settings/printJob';
 
 function getPrinterConfig() {
   if (fs.existsSync(CONFIG_FILE)) {
@@ -143,6 +144,11 @@ async function printKitchenTickets(orderId: any) {
         await sendToNetworkPrinter(kitchenPrinterIp, getESC_POSCommands(ticket));
         console.log(`✅ Printed KOT for ${data.kitchenName} to ${kitchenPrinterIp}`);
       } catch (err) {
+        await PrintJob.create({
+                    content: ticket,
+                    type: 'token',
+                    status: 'pending'
+                });
         console.error(`❌ Failed to print to ${kitchenPrinterIp}`, err);
       }
     } else {
