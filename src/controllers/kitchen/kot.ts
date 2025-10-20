@@ -1,9 +1,9 @@
 import fs from 'fs';
-import net from 'net';
 import { Order } from "../../models/orders/order";
 import Product from "../../models/product/product";
 import Kitchen from "../../models/kitchen/Kitchen";
 import Table from "../../models/table/table";
+import Settings from "../../models/settings/setting";
 
 const CONFIG_FILE = './printer-config.json';
 import PrintJob from '../../models/settings/printJob';
@@ -15,21 +15,6 @@ function getPrinterConfig() {
   return { kitchens: {} };
 }
 
-function sendToNetworkPrinter(ipPort: string, content: Buffer): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const [host, portStr] = ipPort.split(':');
-    const port = parseInt(portStr, 10) || 9100;
-
-    const socket = new net.Socket();
-    socket.connect(port, host, () => {
-      socket.write(content, () => {
-        socket.end();
-        resolve();
-      });
-    });
-    socket.on('error', reject);
-  });
-}
 
 
 function formatDateTime() {
@@ -62,6 +47,10 @@ function getESC_POSCommands(text: string): Buffer {
 
 
 async function printKitchenTickets(orderId: any) {
+
+  const settings = await Settings.findOne();
+
+
   const order = await Order.findById(orderId);
   if (!order) {
     console.error("Order not found.");
@@ -142,11 +131,13 @@ async function printKitchenTickets(orderId: any) {
     if (kitchenPrinterIp) {
       try {
         //await sendToNetworkPrinter(kitchenPrinterIp, getESC_POSCommands(ticket));
-        await PrintJob.create({
-          content:  getESC_POSCommands(ticket),
-          type: 'token',
-          status: 'pending'
-        });
+        if (settings?.auto_print_kot) {
+          await PrintJob.create({
+            content: getESC_POSCommands(ticket),
+            type: 'token',
+            status: 'pending'
+          });
+        }
         console.log(`✅ Printed KOT for ${data.kitchenName} to ${kitchenPrinterIp}`);
       } catch (err) {
         // await PrintJob.create({
@@ -161,6 +152,7 @@ async function printKitchenTickets(orderId: any) {
     }
   }
 
+  console.log(allTickets.trim())
   return { printContent: allTickets.trim() };
 }
 

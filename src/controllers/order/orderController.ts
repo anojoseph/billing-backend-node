@@ -6,6 +6,7 @@ import Bill from '../../models/bill/bill';
 import mongoose from 'mongoose';
 import { printOrder, printToken } from '../../services/printService';
 import { printKitchenTickets } from "../kitchen/kot";
+import OrderHistory from "../../models/orders/OrderHistory";
 
 interface OrderItem {
     id: string;
@@ -23,7 +24,21 @@ interface Addon {
 
 
 export const createOrder = async (req: Request, res: Response): Promise<void> => {
-    const { tableId, orderType, items, paymentType }: { tableId?: string; orderType: 'Dine-in' | 'Takeaway' | 'Bill'; items: OrderItem[], paymentType: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other'; } = req.body;
+    const {
+        tableId,
+        orderType,
+        items,
+        paymentType,
+        discountType,
+        discountValue
+    }: {
+        tableId?: string;
+        orderType: 'Dine-in' | 'Takeaway' | 'Bill';
+        items: OrderItem[],
+        paymentType: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other';
+        discountType?: 'percentage' | 'amount';
+        discountValue?: number;
+    } = req.body;
 
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -32,11 +47,11 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
         const settings = await Settings.findOne();
         const stockUpdateNeeded = settings?.stockUpdate ?? false;
 
-        let totalAmount = 0;
+        let subTotal = 0;
         const processedItems: { id: mongoose.Types.ObjectId; quantity: number; price: number; totalPrice: number; addons?: Addon[]; }[] = [];
-
+        //const processedItems: any[] = [];
         for (const item of items) {
-            const { id, quantity, price } = item;
+            const { id, quantity, price, addons } = item;
 
             const product = await Product.findById(id).session(session);
             if (!product) {
@@ -56,19 +71,26 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                 await product.save({ session });
             }
 
-            const totalPrice = price * quantity;
-            totalAmount += totalPrice;
+            let itemTotal = price * quantity;
+
+            if (addons && Array.isArray(addons)) {
+                for (const addon of addons) {
+                    itemTotal += addon.price * addon.qty;
+                }
+            }
+
+            subTotal += itemTotal;
 
             processedItems.push({
                 id: new mongoose.Types.ObjectId(id),
                 quantity,
                 price,
-                totalPrice,
-                ...(item.addons ? { addons: item.addons } : {})
+                totalPrice: itemTotal,
+                ...(addons ? { addons } : {})
             });
         }
 
-        // ✅ Validate paymentType only if completed order
+
         if ((orderType === 'Takeaway' || orderType === 'Bill') && !paymentType) {
             res.status(400).json({ message: 'Payment type is required for completed orders' });
             await session.abortTransaction();
@@ -89,10 +111,8 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                     }
                 });
 
-                existingOrder.totalAmount += totalAmount
-
+                existingOrder.totalAmount += subTotal;
                 await existingOrder.save({ session });
-
                 await session.commitTransaction();
                 res.status(200).json({
                     message: 'Order updated successfully',
@@ -101,66 +121,98 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
                 return;
             }
         }
+
         const lastOrder = await Order.findOne().sort({ created_at: -1 });
         const nextOrderNumber = lastOrder?.orderNumber
             ? `ORD-${String(parseInt(lastOrder.orderNumber.split('-')[1]) + 1).padStart(4, '0')}`
             : 'ORD-0001';
 
+        // Calculate discount and grand total
+        let discountAmt = 0;
+        if (discountType && discountValue) {
+            discountAmt = discountType === 'percentage'
+                ? (discountValue / 100) * subTotal
+                : discountValue;
+            discountAmt = Math.min(discountAmt, subTotal);
+        }
+        const discountedTotal = subTotal - discountAmt;
+
+        let sgstAmount = 0, cgstAmount = 0, igstAmount = 0, taxTotal = 0;
+
+        if (settings?.tax_status) {
+            const sgst = parseFloat(settings?.sgst || '0');
+            const cgst = parseFloat(settings?.cgst || '0');
+            const igst = parseFloat(settings?.igst || '0');
+
+            if (igst > 0) {
+                igstAmount = discountedTotal * (igst / 100);
+            } else {
+                sgstAmount = discountedTotal * (sgst / 100);
+                cgstAmount = discountedTotal * (cgst / 100);
+            }
+
+            taxTotal = sgstAmount + cgstAmount + igstAmount;
+        }
+
+        const grandTotal = discountedTotal + taxTotal;
+
         const newOrder = new Order({
+
             tableId: orderType === 'Dine-in' ? tableId : null,
             orderType,
             items: processedItems,
-            totalAmount,
+            totalAmount: subTotal,
             status: orderType === 'Takeaway' || orderType === 'Bill' ? 'completed' : 'pending',
             orderNumber: nextOrderNumber,
             paymentType: orderType === 'Dine-in' ? undefined : paymentType,
+            discountType: discountType || null,
+            discountValue: discountValue || 0,
+            discountAmount: discountAmt,
+            sgst: sgstAmount,
+            cgst: cgstAmount,
+            igst: igstAmount,
+            taxAmount: taxTotal,
+            grandTotal: Math.round(grandTotal)
         });
-
         await newOrder.save({ session });
 
-
-
         let printContent = '';
-        // If the order type is 'Takeaway' or 'Bill', create a corresponding bill
+
         if (orderType === 'Takeaway' || orderType === 'Bill') {
+            const roundoffTotal = Math.round(grandTotal);
             const newBill = new Bill({
                 orderId: newOrder._id,
                 tableId: newOrder.tableId,
                 items: newOrder.items,
-                totalAmount: newOrder.totalAmount,
+                totalAmount: subTotal,
+                discountType: discountType || null,
+                discountValue: discountValue || 0,
+                discountAmount: discountAmt,
+                sgst: sgstAmount,
+                cgst: cgstAmount,
+                igst: igstAmount,
+                taxAmount: taxTotal,
+                grandTotal: roundoffTotal,
                 type: orderType,
                 orderNumber: nextOrderNumber,
                 paymentType
-                // Add other fields as necessary
             });
+
 
 
             await newBill.save({ session });
             printContent = await printOrder(newOrder as any, newBill);
             await printToken(newOrder);
-            await printKitchenTickets(newOrder._id); 
-            // Optionally, print the order
-            // await printOrder(newOrder as any);
+            await printKitchenTickets(newOrder._id);
         }
 
         await session.commitTransaction();
-        if (orderType === 'Takeaway' || orderType === 'Bill') {
-            res.status(201).json({
-                message: 'Order created successfully',
-                order: newOrder,
-                ...(printContent && { printContent })
-            });
 
-        }
-        else {
-            res.status(201).json({
-                message: 'Order created successfully',
-                order: newOrder,
-            });
-        }
-
-
-        //await printKitchenTickets(newOrder._id); //printing order
+        res.status(201).json({
+            message: 'Order created successfully',
+            order: newOrder,
+            ...(printContent && { printContent })
+        });
 
     } catch (error) {
         await session.abortTransaction();
@@ -170,7 +222,6 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
         session.endSession();
     }
 };
-
 
 
 export const getOrderById = async (req: Request, res: Response): Promise<void> => {
@@ -215,13 +266,22 @@ export const updateOrder = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
+
 export const completeOrder = async (req: Request, res: Response): Promise<void> => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
         const { orderId } = req.params;
-        const { paymentType } = req.body;
+        const {
+            paymentType,
+            discountType,
+            discountValue
+        }: {
+            paymentType?: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other';
+            discountType?: 'percentage' | 'amount';
+            discountValue?: number;
+        } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(orderId)) {
             res.status(400).json({ message: 'Invalid order ID format' });
@@ -235,6 +295,7 @@ export const completeOrder = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
+        const settings = await Settings.findOne();
         // ✅ Set orderNumber if not already
         if (!order.orderNumber) {
             const lastOrder = await Order.findOne().sort({ created_at: -1 });
@@ -249,20 +310,55 @@ export const completeOrder = async (req: Request, res: Response): Promise<void> 
             order.paymentType = paymentType;
         }
 
-        // ✅ Mark as completed
+        // ✅ Compute discount
+        const subTotal = order.totalAmount;
+        let discountAmt = 0;
+        if (discountType && discountValue) {
+            discountAmt = discountType === 'percentage'
+                ? (discountValue / 100) * subTotal
+                : discountValue;
+
+            discountAmt = Math.min(discountAmt, subTotal);
+        }
+
+        const discountedTotal = subTotal - discountAmt;
+
+        let sgstAmount = 0;
+        let cgstAmount = 0;
+        let taxTotal = 0;
+
+        if (settings?.tax_status) {
+            const sgst = parseFloat(settings.sgst || '0');
+            const cgst = parseFloat(settings.cgst || '0');
+            sgstAmount = discountedTotal * (sgst / 100);
+            cgstAmount = discountedTotal * (cgst / 100);
+            taxTotal = sgstAmount + cgstAmount;
+        }
+
+        const grandTotal = discountedTotal + taxTotal;
+
+        order.discountType = discountType;
+        order.discountValue = discountValue || 0;
+        order.discountAmount = discountAmt;
         order.status = 'completed';
         await order.save({ session });
 
-        // ✅ Create a bill
+        // ✅ Create bill
         const newBill = new Bill({
             orderId: order._id,
             tableId: order.tableId,
             items: order.items,
-            totalAmount: order.totalAmount,
+            totalAmount: subTotal,
+            discountType: order.discountType,
+            discountValue: order.discountValue,
+            discountAmount: discountAmt,
+            taxAmount: taxTotal,
+            grandTotal,
             type: order.orderType,
             orderNumber: order.orderNumber,
-            paymentType: order.paymentType // optional
+            paymentType: order.paymentType
         });
+
 
         await newBill.save({ session });
 
@@ -290,14 +386,27 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
-    const settings = await Settings.findOne();
-    const stockUpdateNeeded = settings?.stockUpdate ?? false;
-
     try {
-        const { billNumber, items, paymentType }: {
+        const settings = await Settings.findOne().session(session);
+        const stockUpdateNeeded = settings?.stockUpdate ?? false;
+
+        const {
+            billNumber,
+            items,
+            paymentType,
+            discountType,
+            discountValue
+        }: {
             billNumber: string;
-            items: Array<{ id: string; quantity: number; price: number; addons?: Array<{ name: string; qty: number; price: number }> }>;
+            items: Array<{
+                id: string;
+                quantity: number;
+                price: number;
+                addons?: Array<{ name: string; qty: number; price: number }>;
+            }>;
             paymentType?: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other';
+            discountType?: 'percentage' | 'amount';
+            discountValue?: number;
         } = req.body;
 
         const bill = await Bill.findOne({ billNumber }).session(session);
@@ -312,29 +421,35 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "Order not found" });
         }
 
+        // Capture previous data for history
+        const previousBillData = bill.toObject();
+        const previousOrderData = order.toObject();
+
         let totalAmount = 0;
         const updatedItems = [];
 
         for (const item of items) {
             const { id, quantity, price } = item;
-
             const product = await Product.findById(id).session(session);
+
             if (!product) {
                 await session.abortTransaction();
                 return res.status(404).json({ message: `Product with id ${id} not found` });
             }
 
-            if (stockUpdateNeeded) {
-                if (quantity > product.qty) {
-                    await session.abortTransaction();
-                    return res.status(400).json({ message: `Not enough stock for ${product.name}` });
-                }
-                product.qty -= quantity;
+            const availableQty = product.qty ?? 0;
+            if (stockUpdateNeeded && quantity > availableQty) {
+                await session.abortTransaction();
+                return res.status(400).json({ message: `Not enough stock for ${product.name}` });
             }
 
-            await product.save({ session });
+            if (stockUpdateNeeded) {
+                product.qty = availableQty - quantity;
+                await product.save({ session });
+            }
 
-            const totalPrice = quantity * price;
+            const addons = Array.isArray(item.addons) ? item.addons : [];
+            const totalPrice = quantity * price + addons.reduce((sum, a) => sum + a.qty * a.price, 0);
             totalAmount += totalPrice;
 
             updatedItems.push({
@@ -342,32 +457,87 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
                 quantity,
                 price,
                 totalPrice,
-                addons: item.addons ?? []
+                addons
             });
         }
 
-        // ✅ Update Order
+        // Compute discount
+        let discountAmount = 0;
+        const discountValNum = Number(discountValue) || 0;
+        if (discountType && !isNaN(discountValNum)) {
+            discountAmount = discountType === 'percentage' ? (discountValNum / 100) * totalAmount : discountValNum;
+            discountAmount = Math.min(discountAmount, totalAmount);
+        }
+
+        // Taxable amount
+        const taxableAmount = totalAmount - discountAmount;
+
+        // Tax calculation safely
+        const sgstRate = Number(settings?.sgst) || 0;
+        const cgstRate = Number(settings?.cgst) || 0;
+        const igstRate = Number(settings?.igst) || 0;
+
+        let cgst = 0, sgst = 0, igst = 0, taxAmount = 0;
+        if (settings?.tax_status) {
+            cgst = (taxableAmount * cgstRate) / 100;
+            sgst = (taxableAmount * sgstRate) / 100;
+            igst = (taxableAmount * igstRate) / 100;
+            taxAmount = cgst + sgst + igst;
+        }
+
+        const grandTotal = taxableAmount + taxAmount;
+
+        // Save history
+        await OrderHistory.create([{
+            orderId: order._id,
+            previousData: previousOrderData,
+            updatedData: {
+                items: updatedItems,
+                totalAmount,
+                discountType,
+                discountValue: discountValNum,
+                discountAmount,
+                cgst,
+                sgst,
+                igst,
+                taxAmount,
+                grandTotal
+            },
+            editedBy: (req as any).user?.id || "Unknown",
+            editedAt: new Date()
+        }], { session });
+
+        // Update Order
         order.items = updatedItems as any;
         order.totalAmount = totalAmount;
-
-        if (paymentType) {
-            order.paymentType = paymentType;
-        }
-
+        order.paymentType = paymentType || order.paymentType;
+        order.discountType = discountType;
+        order.discountValue = discountValNum;
+        order.discountAmount = discountAmount;
         await order.save({ session });
 
-        // ✅ Update Bill
+        // Update Bill
         bill.items = updatedItems as any;
         bill.totalAmount = totalAmount;
-
-        if (paymentType) {
-            bill.paymentType = paymentType;
-        }
-
+        bill.paymentType = paymentType || bill.paymentType;
+        bill.discountType = discountType || null;
+        bill.discountValue = discountValNum;
+        bill.discountAmount = discountAmount;
+        bill.cgst = cgst;
+        bill.sgst = sgst;
+        bill.igst = igst;
+        bill.taxAmount = taxAmount;
+        bill.grandTotal = Math.round(grandTotal);
+        bill.billeditstatus = true;
+        bill.editDate = new Date();
         await bill.save({ session });
 
         await session.commitTransaction();
-        res.status(200).json({ message: "Bill and Order updated successfully", bill });
+
+        res.status(200).json({
+            message: "Bill and Order updated successfully",
+            bill
+        });
 
     } catch (error) {
         await session.abortTransaction();
@@ -377,6 +547,7 @@ export const updateBillAndOrder = async (req: Request, res: Response) => {
         session.endSession();
     }
 };
+
 
 
 export const getBillByNumber = async (req: Request, res: Response) => {
@@ -395,6 +566,8 @@ export const getBillByNumber = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
+
 
 export const deleteBillAndOrder = async (req: any, res: Response) => {
     const session = await mongoose.startSession();

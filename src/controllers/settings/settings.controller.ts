@@ -56,7 +56,18 @@ export const updateSettings = [
             settings.show_available_qty = req.body.show_available_qty === 'true';
             settings.auto_print_bill = req.body.auto_print_bill === 'true';
             settings.auto_print_kot = req.body.auto_print_kot === 'true';
-
+            settings.auto_print_token = req.body.auto_print_token === 'true';
+            settings.tax_status = req.body.tax_status === 'true';
+            settings.sgst = req.body.sgst;
+            settings.cgst = req.body.cgst;
+            settings.igst = req.body.igst;
+            settings.storeAddress = req.body.storeAddress;
+            settings.storeContact = req.body.storeContact;
+            settings.gstNumber = req.body.gstNumber;
+            settings.gst_available = req.body.gst_available;
+            settings.fssai_available = req.body.fssai_available;
+            settings.fssai_number = req.body.fssai_number;
+            settings.whatsapp = req.body.whatsapp;
 
 
             // Handle file upload

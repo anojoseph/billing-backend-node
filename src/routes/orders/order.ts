@@ -7,7 +7,7 @@ const router = express.Router();
 router.post('/create', createOrder);
 router.put('/:orderId/complete', completeOrder);
 
-router.get('/:billNumber', getBillByNumber as RequestHandler); 
+router.get('/:billNumber', getBillByNumber as RequestHandler);
 router.put('/:orderId/update', updateBillAndOrder as RequestHandler);
 router.delete('/:billNumber/delete', deleteBillAndOrder as RequestHandler);
 
@@ -22,7 +22,7 @@ router.post('/:orderId/print', async (req, res) => {
     res.status(500).json({ message: 'Print failed!', error });
   }
 });
-    
+
 
 
 

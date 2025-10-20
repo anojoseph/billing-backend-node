@@ -23,7 +23,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
-  'http://localhost:4200', 'https://billing-frontend-4pxo.onrender.com'
+  'http://localhost:4200', 'https://billing-frontend-4pxo.onrender.com', 'http://localhost:8081'
 ];
 
 const corsOptions = {

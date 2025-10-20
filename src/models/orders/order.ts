@@ -23,7 +23,10 @@ interface IOrder extends Document {
     created_by: Types.ObjectId | null;
     updated_by: Types.ObjectId | null;
     deleted_by: Types.ObjectId | null;
-    paymentType: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other'
+    paymentType: 'Cash' | 'UPI' | 'Card' | 'Swiggy' | 'Zomato' | 'Other',
+    discountType?: 'percentage' | 'amount';
+    discountValue?: number;
+    discountAmount?: number;
 }
 
 const OrderSchema = new Schema({
@@ -61,7 +64,20 @@ const OrderSchema = new Schema({
         required: function (this: { orderType: string }) {
             return this.orderType !== 'Dine-in';
         }
-    }
+    },
+    discountType: {
+        type: String,
+        enum: ['percentage', 'amount'],
+        default: null
+    },
+    discountValue: {
+        type: Number,
+        default: 0
+    },
+    discountAmount: {
+        type: Number,
+        default: 0
+    },
 }, { timestamps: false });
 
 
