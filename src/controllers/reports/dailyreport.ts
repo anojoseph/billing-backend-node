@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import Bill from '../../models/bill/bill'; // Import the Bill model
+import OrderHistory from '../../models/orders/OrderHistory';
+import User from '../../models/auth/User';
+import Product from '../../models/product/product';
 
 export const getBillWiseSalesReport = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -191,6 +194,145 @@ export const getDayWiseSalesReport = async (req: Request, res: Response): Promis
 
   } catch (error) {
     console.error('Error generating day-wise sales report:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// ✅ Report of bill edits in a date range
+export const getBillEditReport = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      res.status(400).json({ message: 'startDate and endDate are required' });
+      return;
+    }
+
+    const start = new Date(startDate as string);
+    const end = new Date(endDate as string);
+    end.setDate(end.getDate() + 1);
+
+    const history = await OrderHistory.aggregate([
+      { $match: { editedAt: { $gte: start, $lt: end } } },
+
+      // Join with Bill to get billNumber
+      {
+        $lookup: {
+          from: 'bills',
+          localField: 'orderId',
+          foreignField: 'orderId',
+          as: 'billInfo'
+        }
+      },
+      { $unwind: '$billInfo' },
+
+      // Join with User using user.id (not _id)
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'editedBy',  // UUID stored in order history
+          foreignField: 'id',      // UUID field in user collection
+          as: 'editor'
+        }
+      },
+      { $unwind: { path: '$editor', preserveNullAndEmptyArrays: true } },
+
+      { $sort: { editedAt: -1 } },
+
+      {
+        $project: {
+          billNumber: '$billInfo.billNumber',
+          editedAt: 1,
+          editedBy: { $ifNull: ['$editor.name', 'Unknown'] },
+          previousTotal: '$previousData.totalAmount',
+          previousGrandTotal: '$previousData.grandTotal',
+          updatedTotal: '$updatedData.totalAmount',
+          updatedGrandTotal: '$updatedData.grandTotal',
+          paymentType: '$previousData.paymentType',
+          items: '$updatedData.items'
+        }
+      }
+    ]);
+
+    // ✅ Enrich item list with product names
+    const allProductIds = [
+      ...new Set(history.flatMap(h => h.items?.map((i: any) => i.id) || []))
+    ];
+
+    const products = await Product.find({ _id: { $in: allProductIds } }).select('name');
+    const productMap = Object.fromEntries(products.map((p: any) => [p._id.toString(), p.name]));
+
+    const enrichedHistory = history.map(h => ({
+      ...h,
+      items: h.items?.map((i: any) => ({
+        ...i,
+        name: productMap[i.id] || i.id
+      }))
+    }));
+
+    res.status(200).json({ history: enrichedHistory });
+
+  } catch (error) {
+    console.error('Error fetching bill edit report:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// ✅ Fetch history for a specific bill
+export const getBillEditHistory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { billNumber } = req.params;
+
+    const bill = await Bill.findOne({ billNumber });
+    if (!bill) {
+      res.status(404).json({ message: 'Bill not found' });
+      return;
+    }
+
+    const history = await OrderHistory.aggregate([
+      { $match: { orderId: bill.orderId } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'editedBy',
+          foreignField: 'id',
+          as: 'editor'
+        }
+      },
+      { $unwind: { path: '$editor', preserveNullAndEmptyArrays: true } },
+      { $sort: { editedAt: -1 } },
+      {
+        $project: {
+          editedAt: 1,
+          editedBy: { $ifNull: ['$editor.name', 'Unknown'] },
+          previousTotal: '$previousData.totalAmount',
+          previousGrandTotal: '$previousData.grandTotal',
+          updatedTotal: '$updatedData.totalAmount',
+          updatedGrandTotal: '$updatedData.grandTotal',
+          paymentType: '$previousData.paymentType',
+          items: '$updatedData.items'
+        }
+      }
+    ]);
+
+    // ✅ Enrich items with product names
+    const allProductIds = [
+      ...new Set(history.flatMap(h => h.items?.map((i: any) => i.id) || []))
+    ];
+    const products = await Product.find({ _id: { $in: allProductIds } }).select('name');
+    const productMap = Object.fromEntries(products.map((p: any) => [p._id.toString(), p.name]));
+
+    const enrichedHistory = history.map(h => ({
+      ...h,
+      items: h.items?.map((i: any) => ({
+        ...i,
+        name: productMap[i.id] || i.id
+      }))
+    }));
+
+    res.status(200).json({ billNumber, history: enrichedHistory });
+  } catch (error) {
+    console.error('Error fetching bill history:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
